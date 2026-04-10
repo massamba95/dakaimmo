@@ -1,8 +1,12 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { SearchBar } from "@/components/dashboard/search-bar";
 import {
   Table,
   TableBody,
@@ -11,7 +15,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, FileText } from "lucide-react";
+import { Plus, FileText, Pencil, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+
+interface Lease {
+  id: string;
+  property_id: string;
+  start_date: string;
+  end_date: string | null;
+  rent_amount: number;
+  status: string;
+  properties: { title: string; user_id: string } | null;
+  tenants: { first_name: string; last_name: string } | null;
+}
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
   ACTIVE: { label: "Actif", variant: "default" },
@@ -19,55 +35,102 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
   TERMINATED: { label: "Resilie", variant: "destructive" },
 };
 
-export default async function LeasesPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export default function LeasesPage() {
+  const [leases, setLeases] = useState<Lease[]>([]);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
-  const { data: leases } = await supabase
-    .from("leases")
-    .select(
-      "*, properties!inner(title, user_id), tenants(first_name, last_name)"
-    )
-    .eq("properties.user_id", user!.id)
-    .order("created_at", { ascending: false });
+  useEffect(() => {
+    loadLeases();
+  }, []);
+
+  async function loadLeases() {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data } = await supabase
+      .from("leases")
+      .select("*, properties!inner(title, user_id), tenants(first_name, last_name)")
+      .eq("properties.user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    setLeases((data as Lease[]) ?? []);
+    setLoading(false);
+  }
+
+  async function handleDelete(lease: Lease) {
+    if (deleting !== lease.id) {
+      setDeleting(lease.id);
+      return;
+    }
+
+    const supabase = createClient();
+    const { error } = await supabase.from("leases").delete().eq("id", lease.id);
+
+    if (error) {
+      toast.error("Erreur lors de la suppression.");
+      setDeleting(null);
+      return;
+    }
+
+    await supabase
+      .from("properties")
+      .update({ status: "AVAILABLE" })
+      .eq("id", lease.property_id);
+
+    toast.success("Bail supprime.");
+    setDeleting(null);
+    loadLeases();
+  }
+
+  const filtered = leases.filter((l) => {
+    const q = search.toLowerCase();
+    return (
+      l.properties?.title.toLowerCase().includes(q) ||
+      l.tenants?.first_name.toLowerCase().includes(q) ||
+      l.tenants?.last_name.toLowerCase().includes(q)
+    );
+  });
+
+  if (loading) {
+    return <div className="flex items-center justify-center py-20"><p className="text-muted-foreground">Chargement...</p></div>;
+  }
 
   return (
     <div>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Baux</h1>
-          <p className="text-muted-foreground mt-1">
-            Contrats de location en cours et passes.
-          </p>
+          <p className="text-muted-foreground mt-1">Contrats de location en cours et passes.</p>
         </div>
         <Link href="/dashboard/leases/new">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Creer un bail
-          </Button>
+          <Button><Plus className="h-4 w-4 mr-2" />Creer un bail</Button>
         </Link>
       </div>
 
-      {!leases || leases.length === 0 ? (
+      {leases.length > 0 && (
+        <div className="mt-6">
+          <SearchBar value={search} onChange={setSearch} placeholder="Rechercher un bail..." />
+        </div>
+      )}
+
+      {leases.length === 0 ? (
         <Card className="mt-8">
           <CardContent className="flex flex-col items-center justify-center py-16">
             <FileText className="h-12 w-12 text-muted-foreground" />
             <h3 className="mt-4 text-lg font-semibold">Aucun bail</h3>
-            <p className="text-muted-foreground mt-1">
-              Les baux apparaitront ici une fois crees.
-            </p>
+            <p className="text-muted-foreground mt-1">Les baux apparaitront ici une fois crees.</p>
             <Link href="/dashboard/leases/new" className="mt-4">
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Creer un bail
-              </Button>
+              <Button><Plus className="h-4 w-4 mr-2" />Creer un bail</Button>
             </Link>
           </CardContent>
         </Card>
+      ) : filtered.length === 0 ? (
+        <p className="text-muted-foreground text-center py-12">Aucun resultat pour &quot;{search}&quot;</p>
       ) : (
-        <Card className="mt-8">
+        <Card className="mt-6">
           <CardContent className="p-0">
             <Table>
               <TableHeader>
@@ -78,36 +141,36 @@ export default async function LeasesPage() {
                   <TableHead>Fin</TableHead>
                   <TableHead>Loyer</TableHead>
                   <TableHead>Statut</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {leases.map((lease) => {
-                  const property = lease.properties as Record<string, string> | null;
-                  const tenant = lease.tenants as Record<string, string> | null;
+                {filtered.map((lease) => {
                   const status = statusConfig[lease.status];
                   return (
                     <TableRow key={lease.id}>
-                      <TableCell className="font-medium">
-                        {property?.title}
-                      </TableCell>
+                      <TableCell className="font-medium">{lease.properties?.title}</TableCell>
+                      <TableCell>{lease.tenants?.first_name} {lease.tenants?.last_name}</TableCell>
+                      <TableCell>{new Date(lease.start_date).toLocaleDateString("fr-FR")}</TableCell>
+                      <TableCell>{lease.end_date ? new Date(lease.end_date).toLocaleDateString("fr-FR") : "Indefini"}</TableCell>
+                      <TableCell>{lease.rent_amount.toLocaleString("fr-FR")} FCFA</TableCell>
+                      <TableCell><Badge variant={status?.variant}>{status?.label}</Badge></TableCell>
                       <TableCell>
-                        {tenant?.first_name} {tenant?.last_name}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(lease.start_date).toLocaleDateString("fr-FR")}
-                      </TableCell>
-                      <TableCell>
-                        {lease.end_date
-                          ? new Date(lease.end_date).toLocaleDateString("fr-FR")
-                          : "Indefini"}
-                      </TableCell>
-                      <TableCell>
-                        {lease.rent_amount.toLocaleString("fr-FR")} FCFA
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={status?.variant}>
-                          {status?.label}
-                        </Badge>
+                        <div className="flex items-center gap-1">
+                          <Link href={`/dashboard/leases/${lease.id}/edit`}>
+                            <Button variant="ghost" size="sm"><Pencil className="h-4 w-4" /></Button>
+                          </Link>
+                          {deleting === lease.id ? (
+                            <div className="flex gap-1">
+                              <Button variant="destructive" size="sm" onClick={() => handleDelete(lease)}>Confirmer</Button>
+                              <Button variant="outline" size="sm" onClick={() => setDeleting(null)}>Non</Button>
+                            </div>
+                          ) : (
+                            <Button variant="ghost" size="sm" onClick={() => handleDelete(lease)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
