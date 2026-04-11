@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { useOrg } from "@/lib/hooks/use-org";
+import { logActivity } from "@/lib/activity-log";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +17,7 @@ export default function EditLeasePage() {
   const params = useParams();
   const id = params.id as string;
   const router = useRouter();
+  const { orgId, userId, userName } = useOrg();
   const [loading, setLoading] = useState(false);
   const [propertyId, setPropertyId] = useState("");
   const [propertyTitle, setPropertyTitle] = useState("");
@@ -109,6 +112,22 @@ export default function EditLeasePage() {
     // Mettre a jour le statut du bien si le statut du bail a change
     if (formData.status !== originalStatus && propertyId) {
       await updatePropertyStatus(propertyId, formData.status);
+    }
+
+    if (orgId && userId) {
+      const changes = [];
+      if (formData.status !== originalStatus) changes.push(`Statut: ${originalStatus} → ${formData.status}`);
+      if (formData.rent_amount !== "") changes.push(`Loyer: ${formData.rent_amount} FCFA`);
+      await logActivity({
+        orgId,
+        userId,
+        userName: userName ?? "Utilisateur",
+        action: "UPDATE",
+        entityType: "LEASE",
+        entityId: id,
+        entityName: `${propertyTitle} - ${tenantName}`,
+        details: changes.join(", ") || "Modification",
+      });
     }
 
     toast.success("Bail modifie avec succes !");

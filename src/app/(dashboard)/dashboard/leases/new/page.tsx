@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useOrg } from "@/lib/hooks/use-org";
+import { logActivity } from "@/lib/activity-log";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,7 +57,7 @@ export default function NewLeasePage() {
     deposit: "0",
   });
 
-  const { orgId } = useOrg();
+  const { orgId, userId, userName } = useOrg();
 
   useEffect(() => {
     if (!orgId) return;
@@ -144,6 +145,16 @@ export default function NewLeasePage() {
       .from("properties")
       .update({ status: "OCCUPIED" })
       .eq("id", formData.property_id);
+
+    await logActivity({
+      orgId: orgId!,
+      userId: userId!,
+      userName: userName ?? "Utilisateur",
+      action: "CREATE",
+      entityType: "LEASE",
+      entityName: `${selectedProperty?.title ?? ""} - ${selectedTenant?.first_name ?? ""} ${selectedTenant?.last_name ?? ""}`,
+      details: `Loyer: ${formData.rent_amount} FCFA`,
+    });
 
     toast.success("Bail cree avec succes !");
     router.push("/dashboard/leases");

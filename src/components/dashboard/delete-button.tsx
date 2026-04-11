@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useOrg } from "@/lib/hooks/use-org";
+import { logActivity } from "@/lib/activity-log";
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -11,14 +13,23 @@ interface DeleteButtonProps {
   table: string;
   id: string;
   label: string;
+  entityName?: string;
   redirectTo: string;
-  onPropertyDelete?: string; // property_id to set back to AVAILABLE
+  onPropertyDelete?: string;
 }
 
-export function DeleteButton({ table, id, label, redirectTo, onPropertyDelete }: DeleteButtonProps) {
+export function DeleteButton({ table, id, label, entityName, redirectTo, onPropertyDelete }: DeleteButtonProps) {
   const router = useRouter();
+  const { orgId, userId, userName } = useOrg();
   const [confirming, setConfirming] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const entityTypeMap: Record<string, string> = {
+    properties: "PROPERTY",
+    tenants: "TENANT",
+    leases: "LEASE",
+    payments: "PAYMENT",
+  };
 
   async function handleDelete() {
     if (!confirming) {
@@ -46,6 +57,18 @@ export function DeleteButton({ table, id, label, redirectTo, onPropertyDelete }:
         .eq("id", onPropertyDelete);
     }
 
+    if (orgId && userId) {
+      await logActivity({
+        orgId,
+        userId,
+        userName: userName ?? "Utilisateur",
+        action: "DELETE",
+        entityType: entityTypeMap[table] as "PROPERTY" | "TENANT" | "LEASE" | "PAYMENT",
+        entityId: id,
+        entityName: entityName ?? label,
+      });
+    }
+
     toast.success(`${label} supprime avec succes.`);
     router.push(redirectTo);
     router.refresh();
@@ -54,21 +77,11 @@ export function DeleteButton({ table, id, label, redirectTo, onPropertyDelete }:
   return (
     <div className="flex items-center gap-2">
       {confirming && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setConfirming(false)}
-          disabled={loading}
-        >
+        <Button variant="outline" size="sm" onClick={() => setConfirming(false)} disabled={loading}>
           Annuler
         </Button>
       )}
-      <Button
-        variant="destructive"
-        size="sm"
-        onClick={handleDelete}
-        disabled={loading}
-      >
+      <Button variant="destructive" size="sm" onClick={handleDelete} disabled={loading}>
         <Trash2 className="h-4 w-4 mr-1" />
         {loading ? "Suppression..." : confirming ? "Confirmer" : "Supprimer"}
       </Button>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useOrg } from "@/lib/hooks/use-org";
 import { getPlanLimits } from "@/lib/plans";
+import { logActivity } from "@/lib/activity-log";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,7 +16,7 @@ import { toast } from "sonner";
 
 export default function NewPropertyPage() {
   const router = useRouter();
-  const { orgId, orgPlan } = useOrg();
+  const { orgId, orgPlan, userId, userName } = useOrg();
   const [loading, setLoading] = useState(false);
   const [propertyCount, setPropertyCount] = useState(0);
   const [limitReached, setLimitReached] = useState(false);
@@ -80,6 +81,16 @@ export default function NewPropertyPage() {
       setLoading(false);
       return;
     }
+
+    await logActivity({
+      orgId: orgId!,
+      userId: userId!,
+      userName: userName ?? "Utilisateur",
+      action: "CREATE",
+      entityType: "PROPERTY",
+      entityName: formData.title,
+      details: `${formData.type} - ${formData.city} - ${formData.rent_amount} FCFA`,
+    });
 
     toast.success("Bien ajoute avec succes !");
     router.push("/dashboard/properties");

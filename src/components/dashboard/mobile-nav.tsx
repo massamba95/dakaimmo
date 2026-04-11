@@ -19,6 +19,7 @@ import {
   Settings,
   LogOut,
   UsersRound,
+  History,
   Menu,
   X,
 } from "lucide-react";
@@ -43,6 +44,7 @@ export function MobileNav() {
     { href: "/dashboard/tenants", label: "Locataires", icon: Users, permission: "tenants:view" },
     { href: "/dashboard/leases", label: "Baux", icon: FileText, permission: "leases:view" },
     { href: "/dashboard/payments", label: "Paiements", icon: CreditCard, permission: "payments:view" },
+    { href: "/dashboard/activity", label: "Historique", icon: History, permission: "team:manage" },
     { href: "/dashboard/team", label: "Equipe", icon: UsersRound, permission: "team:manage" },
     { href: "/dashboard/settings", label: "Parametres", icon: Settings, permission: null },
   ];

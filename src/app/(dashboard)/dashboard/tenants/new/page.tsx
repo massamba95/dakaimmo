@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useOrg } from "@/lib/hooks/use-org";
+import { logActivity } from "@/lib/activity-log";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +15,7 @@ import { toast } from "sonner";
 
 export default function NewTenantPage() {
   const router = useRouter();
-  const { orgId } = useOrg();
+  const { orgId, userId, userName } = useOrg();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     first_name: "",
@@ -51,6 +52,16 @@ export default function NewTenantPage() {
       setLoading(false);
       return;
     }
+
+    await logActivity({
+      orgId: orgId!,
+      userId: userId!,
+      userName: userName ?? "Utilisateur",
+      action: "CREATE",
+      entityType: "TENANT",
+      entityName: `${formData.first_name} ${formData.last_name}`,
+      details: `Tel: ${formData.phone}`,
+    });
 
     toast.success("Locataire ajoute avec succes !");
     router.push("/dashboard/tenants");
