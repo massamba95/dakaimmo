@@ -62,13 +62,23 @@ export default function TeamPage() {
     const supabase = createClient();
     const { data } = await supabase
       .from("memberships")
-      .select("id, role, created_at, user_id, profiles(email, first_name, last_name)")
+      .select("id, role, created_at, user_id")
       .eq("org_id", orgId!)
       .order("created_at");
 
-    if (data) {
+    if (data && data.length > 0) {
+      const userIds = data.map((m) => m.user_id);
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, email, first_name, last_name")
+        .in("id", userIds);
+
+      const profileMap = new Map(
+        (profiles ?? []).map((p) => [p.id, p])
+      );
+
       setMembers(data.map((m) => {
-        const profile = m.profiles as unknown as Record<string, string> | null;
+        const profile = profileMap.get(m.user_id);
         return {
           ...m,
           user_email: profile?.email ?? "—",
