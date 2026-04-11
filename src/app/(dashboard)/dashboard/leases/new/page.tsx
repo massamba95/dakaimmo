@@ -110,6 +110,19 @@ export default function NewLeasePage() {
     setLoading(true);
     const supabase = createClient();
 
+    // Verifier qu'il n'y a pas deja un bail actif sur ce bien
+    const { count: activeLeasesCount } = await supabase
+      .from("leases")
+      .select("*", { count: "exact", head: true })
+      .eq("property_id", formData.property_id)
+      .eq("status", "ACTIVE");
+
+    if (activeLeasesCount && activeLeasesCount > 0) {
+      toast.error("Ce bien a deja un bail actif. Resiliez ou expirez l'ancien bail d'abord.");
+      setLoading(false);
+      return;
+    }
+
     const { error: leaseError } = await supabase.from("leases").insert({
       property_id: formData.property_id,
       tenant_id: formData.tenant_id,

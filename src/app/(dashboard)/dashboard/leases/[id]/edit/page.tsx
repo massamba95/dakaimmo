@@ -16,8 +16,10 @@ export default function EditLeasePage() {
   const id = params.id as string;
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [propertyId, setPropertyId] = useState("");
   const [propertyTitle, setPropertyTitle] = useState("");
   const [tenantName, setTenantName] = useState("");
+  const [originalStatus, setOriginalStatus] = useState("");
   const [formData, setFormData] = useState({
     start_date: "",
     end_date: "",
@@ -31,7 +33,7 @@ export default function EditLeasePage() {
       const supabase = createClient();
       const { data } = await supabase
         .from("leases")
-        .select("*, properties(title), tenants(first_name, last_name)")
+        .select("*, properties(id, title), tenants(first_name, last_name)")
         .eq("id", id)
         .single();
 
@@ -43,14 +45,44 @@ export default function EditLeasePage() {
           deposit: data.deposit.toString(),
           status: data.status,
         });
+        setOriginalStatus(data.status);
         const prop = data.properties as Record<string, string> | null;
         const tenant = data.tenants as Record<string, string> | null;
+        setPropertyId(prop?.id ?? "");
         setPropertyTitle(prop?.title ?? "");
         setTenantName(`${tenant?.first_name ?? ""} ${tenant?.last_name ?? ""}`);
       }
     }
     load();
   }, [id]);
+
+  async function updatePropertyStatus(propId: string, newLeaseStatus: string) {
+    const supabase = createClient();
+
+    if (newLeaseStatus === "ACTIVE") {
+      // Bail actif → bien occupe
+      await supabase
+        .from("properties")
+        .update({ status: "OCCUPIED" })
+        .eq("id", propId);
+    } else {
+      // Bail expire/resilie → verifier s'il reste un autre bail actif
+      const { count } = await supabase
+        .from("leases")
+        .select("*", { count: "exact", head: true })
+        .eq("property_id", propId)
+        .eq("status", "ACTIVE")
+        .neq("id", id);
+
+      if (count === 0) {
+        // Aucun autre bail actif → bien disponible
+        await supabase
+          .from("properties")
+          .update({ status: "AVAILABLE" })
+          .eq("id", propId);
+      }
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -74,6 +106,11 @@ export default function EditLeasePage() {
       return;
     }
 
+    // Mettre a jour le statut du bien si le statut du bail a change
+    if (formData.status !== originalStatus && propertyId) {
+      await updatePropertyStatus(propertyId, formData.status);
+    }
+
     toast.success("Bail modifie avec succes !");
     router.push("/dashboard/leases");
     router.refresh();
@@ -89,7 +126,6 @@ export default function EditLeasePage() {
         <CardHeader><CardTitle>Modifier le bail</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Infos non modifiables */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Bien</Label>
@@ -130,6 +166,16 @@ export default function EditLeasePage() {
                 <option value="EXPIRED">Expire</option>
                 <option value="TERMINATED">Resilie</option>
               </select>
+              {formData.status !== originalStatus && formData.status !== "ACTIVE" && (
+                <p className="text-sm text-yellow-600">
+                  Le bien passera automatiquement en statut &quot;Disponible&quot; s&apos;il n&apos;a plus de bail actif.
+                </p>
+              )}
+              {formData.status !== originalStatus && formData.status === "ACTIVE" && originalStatus !== "ACTIVE" && (
+                <p className="text-sm text-blue-600">
+                  Le bien passera automatiquement en statut &quot;Occupe&quot;.
+                </p>
+              )}
             </div>
 
             <div className="flex gap-4">

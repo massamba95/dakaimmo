@@ -79,10 +79,21 @@ export default function LeasesPage() {
       return;
     }
 
-    await supabase
-      .from("properties")
-      .update({ status: "AVAILABLE" })
-      .eq("id", lease.property_id);
+    // Verifier s'il reste un bail actif sur ce bien
+    if (lease.status === "ACTIVE") {
+      const { count } = await supabase
+        .from("leases")
+        .select("*", { count: "exact", head: true })
+        .eq("property_id", lease.property_id)
+        .eq("status", "ACTIVE");
+
+      if (count === 0) {
+        await supabase
+          .from("properties")
+          .update({ status: "AVAILABLE" })
+          .eq("id", lease.property_id);
+      }
+    }
 
     toast.success("Bail supprime.");
     setDeleting(null);
