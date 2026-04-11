@@ -9,7 +9,9 @@ interface OrgData {
   orgName: string | null;
   orgPlan: string | null;
   orgStatus: string | null;
+  orgOwnerId: string | null;
   role: string | null;
+  membershipStatus: string | null;
   userId: string | null;
   userName: string | null;
   maxProperties: number;
@@ -24,7 +26,9 @@ export function useOrg(): OrgData {
     orgName: null,
     orgPlan: null,
     orgStatus: null,
+    orgOwnerId: null,
     role: null,
+    membershipStatus: null,
     userId: null,
     userName: null,
     maxProperties: 1,
@@ -45,14 +49,29 @@ export function useOrg(): OrgData {
         return;
       }
 
+      // D'abord chercher un membership ACTIVE
       const { data: memberships } = await supabase
         .from("memberships")
-        .select("org_id, role, organizations(name, plan, status, trial_ends_at)")
+        .select("org_id, role, status, organizations(name, plan, status, trial_ends_at, owner_id)")
         .eq("user_id", user.id)
+        .eq("status", "ACTIVE")
         .order("created_at", { ascending: false })
         .limit(1);
 
-      const membership = memberships?.[0];
+      let membership = memberships?.[0];
+
+      // Si pas de membership ACTIVE, chercher PENDING
+      if (!membership) {
+        const { data: pendingMemberships } = await supabase
+          .from("memberships")
+          .select("org_id, role, status, organizations(name, plan, status, trial_ends_at, owner_id)")
+          .eq("user_id", user.id)
+          .eq("status", "PENDING")
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        membership = pendingMemberships?.[0];
+      }
 
       if (membership) {
         const org = membership.organizations as unknown as Record<string, string> | null;
@@ -63,7 +82,9 @@ export function useOrg(): OrgData {
           orgName: org?.name ?? null,
           orgPlan: plan,
           orgStatus: org?.status ?? null,
+          orgOwnerId: org?.owner_id ?? null,
           role: membership.role,
+          membershipStatus: membership.status,
           userId: user.id,
           userName: user.user_metadata?.first_name ?? null,
           maxProperties: limits.maxProperties,

@@ -17,12 +17,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { UsersRound, Plus, Trash2, AlertTriangle } from "lucide-react";
+import { UsersRound, Plus, Trash2, AlertTriangle, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { toast } from "sonner";
 
 interface Member {
   id: string;
   role: string;
+  status: string;
   created_at: string;
   user_id: string;
   user_email: string;
@@ -46,8 +47,9 @@ const roleVariants: Record<string, "default" | "secondary" | "destructive" | "ou
 };
 
 export default function TeamPage() {
-  const { orgId, orgName, orgPlan, role, userId } = useOrg();
+  const { orgId, orgName, orgPlan, orgOwnerId, role, userId } = useOrg();
   const [members, setMembers] = useState<Member[]>([]);
+  const [pendingMembers, setPendingMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [showInvite, setShowInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -58,7 +60,8 @@ export default function TeamPage() {
   const [inviteCode, setInviteCode] = useState("");
 
   const limits = getPlanLimits(orgPlan ?? "FREE");
-  const canAddMore = members.length < limits.maxMembers;
+  const activeCount = members.length;
+  const canAddMore = activeCount < limits.maxMembers;
 
   useEffect(() => {
     if (orgId) {
@@ -81,7 +84,7 @@ export default function TeamPage() {
     const supabase = createClient();
     const { data } = await supabase
       .from("memberships")
-      .select("id, role, created_at, user_id")
+      .select("id, role, status, created_at, user_id")
       .eq("org_id", orgId!)
       .order("created_at");
 
@@ -96,16 +99,54 @@ export default function TeamPage() {
         (profiles ?? []).map((p) => [p.id, p])
       );
 
-      setMembers(data.map((m) => {
+      const allMembers = data.map((m) => {
         const profile = profileMap.get(m.user_id);
         return {
           ...m,
           user_email: profile?.email ?? "—",
           user_name: profile ? `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || "Membre" : "Membre",
         };
-      }));
+      });
+
+      setMembers(allMembers.filter((m) => m.status === "ACTIVE"));
+      setPendingMembers(allMembers.filter((m) => m.status === "PENDING"));
     }
     setLoading(false);
+  }
+
+  async function handleApprove(membershipId: string) {
+    if (!canAddMore) {
+      toast.error(`Limite de ${limits.maxMembers} membre(s) atteinte. Passez au plan superieur.`);
+      return;
+    }
+
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("memberships")
+      .update({ status: "ACTIVE" })
+      .eq("id", membershipId);
+
+    if (error) {
+      toast.error("Erreur lors de l'approbation.");
+    } else {
+      toast.success("Membre approuve !");
+      loadMembers();
+    }
+  }
+
+  async function handleReject(membershipId: string) {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("memberships")
+      .delete()
+      .eq("id", membershipId);
+
+    if (error) {
+      toast.error("Erreur lors du refus.");
+    } else {
+      toast.success("Demande refusee.");
+      loadMembers();
+    }
   }
 
   async function handleInvite(e: React.FormEvent) {
@@ -113,7 +154,6 @@ export default function TeamPage() {
     if (!orgId || !canAddMore) return;
     setInviting(true);
 
-    // Verifier si l'email existe deja dans les profils
     const supabase = createClient();
     const { data: existingProfile } = await supabase
       .from("profiles")
@@ -122,11 +162,11 @@ export default function TeamPage() {
       .single();
 
     if (existingProfile) {
-      // L'utilisateur existe, l'ajouter directement
       const { error } = await supabase.from("memberships").insert({
         org_id: orgId,
         user_id: existingProfile.id,
         role: inviteRole,
+        status: "ACTIVE",
       });
 
       if (error) {
@@ -183,6 +223,12 @@ export default function TeamPage() {
     }
   }
 
+  function canModifyMember(member: Member): boolean {
+    if (member.user_id === userId) return false; // pas soi-meme
+    if (member.user_id === orgOwnerId) return false; // pas le createur
+    return true;
+  }
+
   if (role !== "ADMIN") {
     return (
       <div className="text-center py-20">
@@ -221,32 +267,65 @@ export default function TeamPage() {
             <form onSubmit={handleInvite} className="flex flex-col sm:flex-row items-end gap-4">
               <div className="flex-1 space-y-2 w-full">
                 <Label htmlFor="email">Email de l&apos;employe</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="employe@email.com"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  required
-                />
+                <Input id="email" type="email" placeholder="employe@email.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} required />
               </div>
               <div className="w-full sm:w-48 space-y-2">
                 <Label>Role</Label>
-                <select
-                  className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                  value={inviteRole}
-                  onChange={(e) => setInviteRole(e.target.value)}
-                >
+                <select className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}>
                   <option value="MANAGER">Manager</option>
                   <option value="AGENT">Agent</option>
                   <option value="ACCOUNTANT">Comptable</option>
                   <option value="SECRETARY">Secretaire</option>
                 </select>
               </div>
-              <Button type="submit" disabled={inviting}>
-                {inviting ? "Ajout..." : "Ajouter"}
-              </Button>
+              <Button type="submit" disabled={inviting}>{inviting ? "Ajout..." : "Ajouter"}</Button>
             </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Demandes en attente */}
+      {pendingMembers.length > 0 && (
+        <Card className="mt-6 border-yellow-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-yellow-700">
+              <Clock className="h-5 w-5" />
+              Demandes en attente ({pendingMembers.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Membre</TableHead>
+                  <TableHead>Demande le</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pendingMembers.map((member) => (
+                  <TableRow key={member.id}>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{member.user_name}</p>
+                        <p className="text-sm text-muted-foreground">{member.user_email}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>{new Date(member.created_at).toLocaleDateString("fr-FR")}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" onClick={() => handleApprove(member.id)}>
+                          <CheckCircle2 className="h-4 w-4 mr-1" />Accepter
+                        </Button>
+                        <Button variant="destructive" size="sm" onClick={() => handleReject(member.id)}>
+                          <XCircle className="h-4 w-4 mr-1" />Refuser
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
       )}
@@ -260,17 +339,10 @@ export default function TeamPage() {
                 <p className="text-sm text-muted-foreground">Code d&apos;invitation</p>
                 <p className="text-2xl font-mono font-bold tracking-widest">{inviteCode}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Partagez ce code avec vos employes pour qu&apos;ils rejoignent votre equipe lors de leur inscription.
+                  Partagez ce code avec vos employes. Ils devront creer un compte puis vous approuverez leur demande.
                 </p>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  navigator.clipboard.writeText(inviteCode);
-                  toast.success("Code copie !");
-                }}
-              >
+              <Button variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText(inviteCode); toast.success("Code copie !"); }}>
                 Copier
               </Button>
             </div>
@@ -287,14 +359,14 @@ export default function TeamPage() {
               <p className="font-semibold">{limits.label}</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Membres</p>
-              <p className="font-semibold">{members.length} / {limits.maxMembers}</p>
+              <p className="text-sm text-muted-foreground">Membres actifs</p>
+              <p className="font-semibold">{activeCount} / {limits.maxMembers}</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Liste des membres */}
+      {/* Liste des membres actifs */}
       <Card className="mt-6">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -320,12 +392,16 @@ export default function TeamPage() {
               <TableBody>
                 {members.map((member) => {
                   const isCurrentUser = member.user_id === userId;
-                  const isAdmin = member.role === "ADMIN";
+                  const isOwner = member.user_id === orgOwnerId;
+                  const modifiable = canModifyMember(member);
                   return (
                     <TableRow key={member.id}>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{member.user_name}</p>
+                          <p className="font-medium">
+                            {member.user_name}
+                            {isOwner && <span className="text-xs text-muted-foreground ml-2">(createur)</span>}
+                          </p>
                           <p className="text-sm text-muted-foreground">{member.user_email}</p>
                         </div>
                       </TableCell>
@@ -347,8 +423,8 @@ export default function TeamPage() {
                         ) : (
                           <Badge
                             variant={roleVariants[member.role] ?? "outline"}
-                            className={!isCurrentUser && !isAdmin ? "cursor-pointer" : ""}
-                            onClick={() => !isCurrentUser && !isAdmin && setChangingRole(member.id)}
+                            className={modifiable ? "cursor-pointer" : ""}
+                            onClick={() => modifiable && setChangingRole(member.id)}
                           >
                             {roleLabels[member.role] ?? member.role}
                           </Badge>
@@ -356,7 +432,7 @@ export default function TeamPage() {
                       </TableCell>
                       <TableCell>{new Date(member.created_at).toLocaleDateString("fr-FR")}</TableCell>
                       <TableCell>
-                        {!isCurrentUser && !isAdmin && (
+                        {modifiable && (
                           <div className="flex items-center gap-1">
                             {deleting === member.id ? (
                               <div className="flex gap-1">
@@ -370,9 +446,8 @@ export default function TeamPage() {
                             )}
                           </div>
                         )}
-                        {isCurrentUser && (
-                          <span className="text-xs text-muted-foreground">Vous</span>
-                        )}
+                        {isCurrentUser && <span className="text-xs text-muted-foreground">Vous</span>}
+                        {isOwner && !isCurrentUser && <span className="text-xs text-muted-foreground">Protege</span>}
                       </TableCell>
                     </TableRow>
                   );

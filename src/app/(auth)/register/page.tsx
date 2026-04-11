@@ -137,11 +137,12 @@ export default function RegisterPage() {
         return;
       }
     } else if (mode === "join" && orgToJoin) {
-      // 2b. Rejoindre l'organisation existante
+      // 2b. Demander a rejoindre l'organisation (statut PENDING)
       const { error: memberError } = await supabase.from("memberships").insert({
         org_id: orgToJoin.id,
         user_id: authData.user.id,
         role: "AGENT",
+        status: "PENDING",
       });
 
       if (memberError) {
