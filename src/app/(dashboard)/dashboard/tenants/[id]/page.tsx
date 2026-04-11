@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { useOrg } from "@/lib/hooks/use-org";
+import { hasPermission } from "@/lib/permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +40,9 @@ const statusLabels: Record<string, { label: string; variant: "default" | "second
 export default function TenantDetailPage() {
   const params = useParams();
   const id = params.id as string;
+  const { role } = useOrg();
+  const canEdit = hasPermission(role, "tenants:edit");
+  const canDelete = hasPermission(role, "tenants:delete");
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [leases, setLeases] = useState<LeaseWithProperty[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,10 +90,14 @@ export default function TenantDetailPage() {
           <p className="text-muted-foreground mt-1">Locataire depuis le {new Date(tenant.created_at).toLocaleDateString("fr-FR")}</p>
         </div>
         <div className="flex items-center gap-3">
-          <Link href={`/dashboard/tenants/${id}/edit`}>
-            <Button variant="outline" size="sm"><Pencil className="h-4 w-4 mr-1" />Modifier</Button>
-          </Link>
-          <DeleteButton table="tenants" id={id} label="Locataire" redirectTo="/dashboard/tenants" />
+          {canEdit && (
+            <Link href={`/dashboard/tenants/${id}/edit`}>
+              <Button variant="outline" size="sm"><Pencil className="h-4 w-4 mr-1" />Modifier</Button>
+            </Link>
+          )}
+          {canDelete && (
+            <DeleteButton table="tenants" id={id} label="Locataire" redirectTo="/dashboard/tenants" />
+          )}
         </div>
       </div>
 

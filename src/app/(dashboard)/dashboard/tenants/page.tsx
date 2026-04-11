@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useOrg } from "@/lib/hooks/use-org";
+import { hasPermission } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { SearchBar } from "@/components/dashboard/search-bar";
@@ -28,7 +29,8 @@ interface Tenant {
 }
 
 export default function TenantsPage() {
-  const { orgId } = useOrg();
+  const { orgId, role } = useOrg();
+  const canCreate = hasPermission(role, "tenants:create");
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -71,9 +73,11 @@ export default function TenantsPage() {
           <h1 className="text-3xl font-bold">Locataires</h1>
           <p className="text-muted-foreground mt-1">Gerez les informations de vos locataires.</p>
         </div>
-        <Link href="/dashboard/tenants/new">
-          <Button><Plus className="h-4 w-4 mr-2" />Ajouter un locataire</Button>
-        </Link>
+        {canCreate && (
+          <Link href="/dashboard/tenants/new">
+            <Button><Plus className="h-4 w-4 mr-2" />Ajouter un locataire</Button>
+          </Link>
+        )}
       </div>
 
       {tenants.length > 0 && (

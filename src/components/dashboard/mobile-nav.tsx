@@ -5,7 +5,9 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useOrg } from "@/lib/hooks/use-org";
+import { hasPermission } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
+import type { Permission } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import {
   Building2,
@@ -35,18 +37,18 @@ export function MobileNav() {
   const { orgName, role, loading } = useOrg();
   const [open, setOpen] = useState(false);
 
-  const navItems = [
-    { href: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard, roles: null },
-    { href: "/dashboard/properties", label: "Mes biens", icon: Home, roles: null },
-    { href: "/dashboard/tenants", label: "Locataires", icon: Users, roles: null },
-    { href: "/dashboard/leases", label: "Baux", icon: FileText, roles: null },
-    { href: "/dashboard/payments", label: "Paiements", icon: CreditCard, roles: null },
-    { href: "/dashboard/team", label: "Equipe", icon: UsersRound, roles: ["ADMIN"] },
-    { href: "/dashboard/settings", label: "Parametres", icon: Settings, roles: ["ADMIN", "MANAGER"] },
+  const navItems: { href: string; label: string; icon: typeof LayoutDashboard; permission: Permission | null }[] = [
+    { href: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard, permission: null },
+    { href: "/dashboard/properties", label: "Mes biens", icon: Home, permission: "properties:view" },
+    { href: "/dashboard/tenants", label: "Locataires", icon: Users, permission: "tenants:view" },
+    { href: "/dashboard/leases", label: "Baux", icon: FileText, permission: "leases:view" },
+    { href: "/dashboard/payments", label: "Paiements", icon: CreditCard, permission: "payments:view" },
+    { href: "/dashboard/team", label: "Equipe", icon: UsersRound, permission: "team:manage" },
+    { href: "/dashboard/settings", label: "Parametres", icon: Settings, permission: null },
   ];
 
   const visibleItems = navItems.filter(
-    (item) => !item.roles || (role && item.roles.includes(role))
+    (item) => !item.permission || hasPermission(role, item.permission)
   );
 
   async function handleLogout() {

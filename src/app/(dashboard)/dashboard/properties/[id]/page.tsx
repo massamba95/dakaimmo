@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { useOrg } from "@/lib/hooks/use-org";
+import { hasPermission } from "@/lib/permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,6 +51,9 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
 export default function PropertyDetailPage() {
   const params = useParams();
   const id = params.id as string;
+  const { role } = useOrg();
+  const canEdit = hasPermission(role, "properties:edit");
+  const canDelete = hasPermission(role, "properties:delete");
   const [property, setProperty] = useState<Property | null>(null);
   const [leases, setLeases] = useState<LeaseWithTenant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,10 +104,14 @@ export default function PropertyDetailPage() {
         </div>
         <div className="flex items-center gap-3">
           <Badge variant={status?.variant} className="text-sm px-3 py-1">{status?.label}</Badge>
-          <Link href={`/dashboard/properties/${id}/edit`}>
-            <Button variant="outline" size="sm"><Pencil className="h-4 w-4 mr-1" />Modifier</Button>
-          </Link>
-          <DeleteButton table="properties" id={id} label="Bien" redirectTo="/dashboard/properties" />
+          {canEdit && (
+            <Link href={`/dashboard/properties/${id}/edit`}>
+              <Button variant="outline" size="sm"><Pencil className="h-4 w-4 mr-1" />Modifier</Button>
+            </Link>
+          )}
+          {canDelete && (
+            <DeleteButton table="properties" id={id} label="Bien" redirectTo="/dashboard/properties" />
+          )}
         </div>
       </div>
 

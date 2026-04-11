@@ -17,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { UsersRound, Plus, Trash2 } from "lucide-react";
+import { UsersRound, Plus, Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 interface Member {
@@ -46,13 +46,18 @@ const roleVariants: Record<string, "default" | "secondary" | "destructive" | "ou
 };
 
 export default function TeamPage() {
-  const { orgId, orgName, orgPlan, role } = useOrg();
+  const { orgId, orgName, orgPlan, role, userId } = useOrg();
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [showInvite, setShowInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("AGENT");
   const [inviting, setInviting] = useState(false);
+  const [changingRole, setChangingRole] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const limits = getPlanLimits(orgPlan ?? "FREE");
+  const canAddMore = members.length < limits.maxMembers;
 
   useEffect(() => {
     if (orgId) loadMembers();
@@ -91,17 +96,38 @@ export default function TeamPage() {
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
-    if (!orgId) return;
+    if (!orgId || !canAddMore) return;
     setInviting(true);
 
-    // For now, we create the user via Supabase Auth invite
-    // In production, this would send an email invitation
+    // Verifier si l'email existe deja dans les profils
     const supabase = createClient();
+    const { data: existingProfile } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("email", inviteEmail)
+      .single();
 
-    // Check if user already exists by trying to find their membership
-    toast.info(
-      `Invitation envoyee a ${inviteEmail} avec le role ${roleLabels[inviteRole]}.`
-    );
+    if (existingProfile) {
+      // L'utilisateur existe, l'ajouter directement
+      const { error } = await supabase.from("memberships").insert({
+        org_id: orgId,
+        user_id: existingProfile.id,
+        role: inviteRole,
+      });
+
+      if (error) {
+        if (error.code === "23505") {
+          toast.error("Cet utilisateur est deja membre de l'equipe.");
+        } else {
+          toast.error("Erreur lors de l'ajout du membre.");
+        }
+      } else {
+        toast.success(`${inviteEmail} ajoute avec le role ${roleLabels[inviteRole]}.`);
+        loadMembers();
+      }
+    } else {
+      toast.error("Aucun compte trouve avec cet email. L'utilisateur doit d'abord creer un compte sur Jappale Immo.");
+    }
 
     setInviteEmail("");
     setInviteRole("AGENT");
@@ -109,17 +135,38 @@ export default function TeamPage() {
     setInviting(false);
   }
 
+  async function handleChangeRole(membershipId: string, newRole: string) {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("memberships")
+      .update({ role: newRole })
+      .eq("id", membershipId);
+
+    if (error) {
+      toast.error("Erreur lors du changement de role.");
+    } else {
+      toast.success("Role modifie avec succes.");
+      setChangingRole(null);
+      loadMembers();
+    }
+  }
+
   async function handleRemoveMember(membershipId: string) {
+    if (deleting !== membershipId) {
+      setDeleting(membershipId);
+      return;
+    }
+
     const supabase = createClient();
     const { error } = await supabase.from("memberships").delete().eq("id", membershipId);
 
     if (error) {
       toast.error("Erreur lors de la suppression du membre.");
-      return;
+    } else {
+      toast.success("Membre retire de l'equipe.");
+      setDeleting(null);
+      loadMembers();
     }
-
-    toast.success("Membre retire de l'equipe.");
-    loadMembers();
   }
 
   if (role !== "ADMIN") {
@@ -135,23 +182,31 @@ export default function TeamPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Equipe</h1>
-          <p className="text-muted-foreground mt-1">
-            Gerez les membres de {orgName}.
-          </p>
+          <p className="text-muted-foreground mt-1">Gerez les membres de {orgName}.</p>
         </div>
-        <Button onClick={() => setShowInvite(!showInvite)}>
-          <Plus className="h-4 w-4 mr-2" />Inviter un membre
-        </Button>
+        {canAddMore ? (
+          <Button onClick={() => setShowInvite(!showInvite)}>
+            <Plus className="h-4 w-4 mr-2" />Ajouter un membre
+          </Button>
+        ) : (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <AlertTriangle className="h-4 w-4 text-yellow-500" />
+            Limite de {limits.maxMembers} membre(s) atteinte
+          </div>
+        )}
       </div>
 
       {/* Formulaire d'invitation */}
       {showInvite && (
         <Card className="mt-6">
-          <CardHeader><CardTitle>Inviter un membre</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Ajouter un membre</CardTitle></CardHeader>
           <CardContent>
-            <form onSubmit={handleInvite} className="flex items-end gap-4">
-              <div className="flex-1 space-y-2">
-                <Label htmlFor="email">Email</Label>
+            <p className="text-sm text-muted-foreground mb-4">
+              L&apos;utilisateur doit deja avoir un compte sur Jappale Immo. Entrez son email pour l&apos;ajouter a votre equipe.
+            </p>
+            <form onSubmit={handleInvite} className="flex flex-col sm:flex-row items-end gap-4">
+              <div className="flex-1 space-y-2 w-full">
+                <Label htmlFor="email">Email de l&apos;employe</Label>
                 <Input
                   id="email"
                   type="email"
@@ -161,7 +216,7 @@ export default function TeamPage() {
                   required
                 />
               </div>
-              <div className="w-48 space-y-2">
+              <div className="w-full sm:w-48 space-y-2">
                 <Label>Role</Label>
                 <select
                   className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
@@ -175,7 +230,7 @@ export default function TeamPage() {
                 </select>
               </div>
               <Button type="submit" disabled={inviting}>
-                {inviting ? "Envoi..." : "Inviter"}
+                {inviting ? "Ajout..." : "Ajouter"}
               </Button>
             </form>
           </CardContent>
@@ -188,11 +243,11 @@ export default function TeamPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Plan actuel</p>
-              <p className="font-semibold">{orgPlan === "FREE" ? "Gratuit" : orgPlan === "PRO" ? "Pro" : orgPlan === "AGENCY" ? "Agence" : orgPlan}</p>
+              <p className="font-semibold">{limits.label}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Membres</p>
-              <p className="font-semibold">{members.length} / {getPlanLimits(orgPlan ?? "FREE").maxMembers}</p>
+              <p className="font-semibold">{members.length} / {limits.maxMembers}</p>
             </div>
           </div>
         </CardContent>
@@ -218,37 +273,69 @@ export default function TeamPage() {
                   <TableHead>Membre</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Depuis</TableHead>
-                  <TableHead></TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {members.map((member) => (
-                  <TableRow key={member.id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{member.user_name}</p>
-                        <p className="text-sm text-muted-foreground">{member.user_email}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={roleVariants[member.role] ?? "outline"}>
-                        {roleLabels[member.role] ?? member.role}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{new Date(member.created_at).toLocaleDateString("fr-FR")}</TableCell>
-                    <TableCell>
-                      {member.role !== "ADMIN" && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveMember(member.id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {members.map((member) => {
+                  const isCurrentUser = member.user_id === userId;
+                  const isAdmin = member.role === "ADMIN";
+                  return (
+                    <TableRow key={member.id}>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{member.user_name}</p>
+                          <p className="text-sm text-muted-foreground">{member.user_email}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {changingRole === member.id ? (
+                          <select
+                            className="h-8 rounded border border-input bg-background px-2 text-sm"
+                            value={member.role}
+                            onChange={(e) => handleChangeRole(member.id, e.target.value)}
+                            onBlur={() => setChangingRole(null)}
+                            autoFocus
+                          >
+                            <option value="ADMIN">Administrateur</option>
+                            <option value="MANAGER">Manager</option>
+                            <option value="AGENT">Agent</option>
+                            <option value="ACCOUNTANT">Comptable</option>
+                            <option value="SECRETARY">Secretaire</option>
+                          </select>
+                        ) : (
+                          <Badge
+                            variant={roleVariants[member.role] ?? "outline"}
+                            className={!isCurrentUser && !isAdmin ? "cursor-pointer" : ""}
+                            onClick={() => !isCurrentUser && !isAdmin && setChangingRole(member.id)}
+                          >
+                            {roleLabels[member.role] ?? member.role}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>{new Date(member.created_at).toLocaleDateString("fr-FR")}</TableCell>
+                      <TableCell>
+                        {!isCurrentUser && !isAdmin && (
+                          <div className="flex items-center gap-1">
+                            {deleting === member.id ? (
+                              <div className="flex gap-1">
+                                <Button variant="destructive" size="sm" onClick={() => handleRemoveMember(member.id)}>Confirmer</Button>
+                                <Button variant="outline" size="sm" onClick={() => setDeleting(null)}>Non</Button>
+                              </div>
+                            ) : (
+                              <Button variant="ghost" size="sm" onClick={() => handleRemoveMember(member.id)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                        {isCurrentUser && (
+                          <span className="text-xs text-muted-foreground">Vous</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}

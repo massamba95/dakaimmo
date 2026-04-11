@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useOrg } from "@/lib/hooks/use-org";
+import { hasPermission } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -46,7 +47,8 @@ const methodLabels: Record<string, string> = {
 };
 
 export default function PaymentsPage() {
-  const { orgId } = useOrg();
+  const { orgId, role } = useOrg();
+  const canCreate = hasPermission(role, "payments:create");
   const [payments, setPayments] = useState<Payment[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -90,9 +92,11 @@ export default function PaymentsPage() {
           <h1 className="text-3xl font-bold">Paiements</h1>
           <p className="text-muted-foreground mt-1">Historique de tous les paiements de loyer.</p>
         </div>
-        <Link href="/dashboard/payments/new">
-          <Button><Plus className="h-4 w-4 mr-2" />Enregistrer un paiement</Button>
-        </Link>
+        {canCreate && (
+          <Link href="/dashboard/payments/new">
+            <Button><Plus className="h-4 w-4 mr-2" />Enregistrer un paiement</Button>
+          </Link>
+        )}
       </div>
 
       {payments.length > 0 && (

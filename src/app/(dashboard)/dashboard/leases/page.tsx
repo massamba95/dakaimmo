@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useOrg } from "@/lib/hooks/use-org";
+import { hasPermission } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -37,7 +38,10 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
 };
 
 export default function LeasesPage() {
-  const { orgId } = useOrg();
+  const { orgId, role } = useOrg();
+  const canCreate = hasPermission(role, "leases:create");
+  const canEdit = hasPermission(role, "leases:edit");
+  const canDelete = hasPermission(role, "leases:delete");
   const [leases, setLeases] = useState<Lease[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -105,9 +109,11 @@ export default function LeasesPage() {
           <h1 className="text-3xl font-bold">Baux</h1>
           <p className="text-muted-foreground mt-1">Contrats de location en cours et passes.</p>
         </div>
-        <Link href="/dashboard/leases/new">
-          <Button><Plus className="h-4 w-4 mr-2" />Creer un bail</Button>
-        </Link>
+        {canCreate && (
+          <Link href="/dashboard/leases/new">
+            <Button><Plus className="h-4 w-4 mr-2" />Creer un bail</Button>
+          </Link>
+        )}
       </div>
 
       {leases.length > 0 && (
@@ -157,18 +163,22 @@ export default function LeasesPage() {
                       <TableCell><Badge variant={status?.variant}>{status?.label}</Badge></TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <Link href={`/dashboard/leases/${lease.id}/edit`}>
-                            <Button variant="ghost" size="sm"><Pencil className="h-4 w-4" /></Button>
-                          </Link>
-                          {deleting === lease.id ? (
-                            <div className="flex gap-1">
-                              <Button variant="destructive" size="sm" onClick={() => handleDelete(lease)}>Confirmer</Button>
-                              <Button variant="outline" size="sm" onClick={() => setDeleting(null)}>Non</Button>
-                            </div>
-                          ) : (
-                            <Button variant="ghost" size="sm" onClick={() => handleDelete(lease)}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                          {canEdit && (
+                            <Link href={`/dashboard/leases/${lease.id}/edit`}>
+                              <Button variant="ghost" size="sm"><Pencil className="h-4 w-4" /></Button>
+                            </Link>
+                          )}
+                          {canDelete && (
+                            deleting === lease.id ? (
+                              <div className="flex gap-1">
+                                <Button variant="destructive" size="sm" onClick={() => handleDelete(lease)}>Confirmer</Button>
+                                <Button variant="outline" size="sm" onClick={() => setDeleting(null)}>Non</Button>
+                              </div>
+                            ) : (
+                              <Button variant="ghost" size="sm" onClick={() => handleDelete(lease)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            )
                           )}
                         </div>
                       </TableCell>
