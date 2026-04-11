@@ -94,7 +94,8 @@ export default function RegisterPage() {
       .single();
 
     if (orgError || !org) {
-      setError("Erreur lors de la creation de l'organisation.");
+      console.error("Org creation error:", orgError);
+      setError(`Erreur organisation: ${orgError?.message ?? "inconnue"} (code: ${orgError?.code ?? "?"})`);
       setLoading(false);
       return;
     }
@@ -107,7 +108,8 @@ export default function RegisterPage() {
     });
 
     if (memberError) {
-      setError("Erreur lors de la configuration du compte.");
+      console.error("Membership error:", memberError);
+      setError(`Erreur membership: ${memberError?.message ?? "inconnue"}`);
       setLoading(false);
       return;
     }
