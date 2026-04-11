@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useOrg } from "@/lib/hooks/use-org";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,20 +15,35 @@ import {
   CreditCard,
   Settings,
   LogOut,
+  UsersRound,
 } from "lucide-react";
 
-const navItems = [
-  { href: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
-  { href: "/dashboard/properties", label: "Mes biens", icon: Home },
-  { href: "/dashboard/tenants", label: "Locataires", icon: Users },
-  { href: "/dashboard/leases", label: "Baux", icon: FileText },
-  { href: "/dashboard/payments", label: "Paiements", icon: CreditCard },
-  { href: "/dashboard/settings", label: "Parametres", icon: Settings },
-];
+const roleLabels: Record<string, string> = {
+  ADMIN: "Administrateur",
+  MANAGER: "Manager",
+  AGENT: "Agent",
+  ACCOUNTANT: "Comptable",
+  SECRETARY: "Secretaire",
+};
 
 export function SidebarNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const { orgName, role, loading } = useOrg();
+
+  const navItems = [
+    { href: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard, roles: null },
+    { href: "/dashboard/properties", label: "Mes biens", icon: Home, roles: null },
+    { href: "/dashboard/tenants", label: "Locataires", icon: Users, roles: null },
+    { href: "/dashboard/leases", label: "Baux", icon: FileText, roles: null },
+    { href: "/dashboard/payments", label: "Paiements", icon: CreditCard, roles: null },
+    { href: "/dashboard/team", label: "Equipe", icon: UsersRound, roles: ["ADMIN"] },
+    { href: "/dashboard/settings", label: "Parametres", icon: Settings, roles: ["ADMIN", "MANAGER"] },
+  ];
+
+  const visibleItems = navItems.filter(
+    (item) => !item.roles || (role && item.roles.includes(role))
+  );
 
   async function handleLogout() {
     const supabase = createClient();
@@ -43,10 +59,16 @@ export function SidebarNav() {
           <Building2 className="h-7 w-7 text-primary" />
           <span className="text-lg font-bold">Jappalé Immo</span>
         </Link>
+        {!loading && orgName && (
+          <div className="mt-3">
+            <p className="text-sm font-medium truncate">{orgName}</p>
+            <p className="text-xs text-muted-foreground">{roleLabels[role ?? ""] ?? role}</p>
+          </div>
+        )}
       </div>
 
       <nav className="flex-1 p-4 space-y-1">
-        {navItems.map((item) => {
+        {visibleItems.map((item) => {
           const isActive =
             pathname === item.href ||
             (item.href !== "/dashboard" && pathname.startsWith(item.href));

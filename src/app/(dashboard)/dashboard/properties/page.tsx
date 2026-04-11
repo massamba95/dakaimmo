@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { useOrg } from "@/lib/hooks/use-org";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -45,27 +46,27 @@ const typeIcons: Record<string, typeof Home> = {
 };
 
 export default function PropertiesPage() {
+  const { orgId } = useOrg();
   const [properties, setProperties] = useState<Property[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!orgId) return;
     async function load() {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
 
       const { data } = await supabase
         .from("properties")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("org_id", orgId!)
         .order("created_at", { ascending: false });
 
       setProperties(data ?? []);
       setLoading(false);
     }
     load();
-  }, []);
+  }, [orgId]);
 
   const filtered = properties.filter((p) => {
     const q = search.toLowerCase();

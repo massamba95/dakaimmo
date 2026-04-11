@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { useOrg } from "@/lib/hooks/use-org";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { SearchBar } from "@/components/dashboard/search-bar";
@@ -27,27 +28,27 @@ interface Tenant {
 }
 
 export default function TenantsPage() {
+  const { orgId } = useOrg();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!orgId) return;
     async function load() {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
 
       const { data } = await supabase
         .from("tenants")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("org_id", orgId!)
         .order("created_at", { ascending: false });
 
       setTenants(data ?? []);
       setLoading(false);
     }
     load();
-  }, []);
+  }, [orgId]);
 
   const filtered = tenants.filter((t) => {
     const q = search.toLowerCase();

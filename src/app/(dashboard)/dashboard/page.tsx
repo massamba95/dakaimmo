@@ -1,55 +1,67 @@
-import { createClient } from "@/lib/supabase/server";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+"use client";
+
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { useOrg } from "@/lib/hooks/use-org";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2, Users, CreditCard, AlertTriangle } from "lucide-react";
 
-export default async function DashboardPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export default function DashboardPage() {
+  const { orgId, orgName, orgStatus, loading: orgLoading } = useOrg();
+  const [stats, setStats] = useState({
+    totalProperties: 0,
+    occupiedProperties: 0,
+    totalTenants: 0,
+    pendingAmount: 0,
+    pendingCount: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [userName, setUserName] = useState("");
 
-  const { count: totalProperties } = await supabase
-    .from("properties")
-    .select("*", { count: "exact", head: true })
-    .eq("user_id", user!.id);
+  useEffect(() => {
+    if (!orgId) return;
 
-  const { count: occupiedProperties } = await supabase
-    .from("properties")
-    .select("*", { count: "exact", head: true })
-    .eq("user_id", user!.id)
-    .eq("status", "OCCUPIED");
+    async function load() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      setUserName(user?.user_metadata?.first_name ?? "Utilisateur");
 
-  const { count: totalTenants } = await supabase
-    .from("tenants")
-    .select("*", { count: "exact", head: true })
-    .eq("user_id", user!.id);
+      const [propRes, occRes, tenRes] = await Promise.all([
+        supabase.from("properties").select("*", { count: "exact", head: true }).eq("org_id", orgId!),
+        supabase.from("properties").select("*", { count: "exact", head: true }).eq("org_id", orgId!).eq("status", "OCCUPIED"),
+        supabase.from("tenants").select("*", { count: "exact", head: true }).eq("org_id", orgId!),
+      ]);
 
-  const { data: pendingPayments } = await supabase
-    .from("payments")
-    .select("amount, leases!inner(property_id, properties!inner(user_id))")
-    .eq("status", "PENDING")
-    .eq("leases.properties.user_id", user!.id);
+      setStats({
+        totalProperties: propRes.count ?? 0,
+        occupiedProperties: occRes.count ?? 0,
+        totalTenants: tenRes.count ?? 0,
+        pendingAmount: 0,
+        pendingCount: 0,
+      });
+      setLoading(false);
+    }
+    load();
+  }, [orgId]);
 
-  const pendingAmount = pendingPayments?.reduce((sum, p) => sum + p.amount, 0) ?? 0;
-  const total = totalProperties ?? 0;
-  const occupied = occupiedProperties ?? 0;
-  const occupancyRate = total > 0 ? Math.round((occupied / total) * 100) : 0;
+  if (orgLoading || loading) {
+    return <div className="flex items-center justify-center py-20"><p className="text-muted-foreground">Chargement...</p></div>;
+  }
 
-  const stats = [
+  const occupancyRate = stats.totalProperties > 0
+    ? Math.round((stats.occupiedProperties / stats.totalProperties) * 100)
+    : 0;
+
+  const statCards = [
     {
       title: "Total biens",
-      value: total,
+      value: stats.totalProperties,
       icon: Building2,
-      description: `${occupied} occupes`,
+      description: `${stats.occupiedProperties} occupes`,
     },
     {
       title: "Locataires",
-      value: totalTenants ?? 0,
+      value: stats.totalTenants,
       icon: Users,
       description: "Locataires actifs",
     },
@@ -57,108 +69,51 @@ export default async function DashboardPage() {
       title: "Taux d'occupation",
       value: `${occupancyRate}%`,
       icon: Building2,
-      description: `${occupied}/${total} biens`,
+      description: `${stats.occupiedProperties}/${stats.totalProperties} biens`,
     },
     {
       title: "Impayes",
-      value: `${pendingAmount.toLocaleString("fr-FR")} FCFA`,
+      value: `${stats.pendingAmount.toLocaleString("fr-FR")} FCFA`,
       icon: AlertTriangle,
-      description: `${pendingPayments?.length ?? 0} paiement(s) en attente`,
+      description: `${stats.pendingCount} paiement(s) en attente`,
     },
   ];
 
-  const { data: recentPayments } = await supabase
-    .from("payments")
-    .select(
-      "*, leases(tenant_id, tenants(first_name, last_name), property_id, properties(title))"
-    )
-    .eq("leases.properties.user_id", user!.id)
-    .order("created_at", { ascending: false })
-    .limit(5);
-
   return (
     <div>
+      {/* Bandeau blocage */}
+      {orgStatus === "BLOCKED" && (
+        <div className="bg-destructive/10 text-destructive p-4 rounded-lg mb-6 text-center">
+          Votre abonnement est expire. Renouvelez pour continuer a utiliser toutes les fonctionnalites.
+        </div>
+      )}
+
+      {/* Bandeau essai */}
+      {orgStatus === "TRIAL" && (
+        <div className="bg-blue-50 text-blue-700 p-4 rounded-lg mb-6 text-center">
+          Vous etes en periode d&apos;essai gratuit. Profitez de toutes les fonctionnalites !
+        </div>
+      )}
+
       <h1 className="text-3xl font-bold">Tableau de bord</h1>
       <p className="text-muted-foreground mt-1">
-        Bienvenue, {user!.user_metadata?.first_name ?? "Utilisateur"} !
+        Bienvenue, {userName} ! — {orgName}
       </p>
 
-      {/* Stats */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-8">
-        {stats.map((stat) => (
+        {statCards.map((stat) => (
           <Card key={stat.title}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {stat.title}
-              </CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
               <stat.icon className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {stat.description}
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">{stat.description}</p>
             </CardContent>
           </Card>
         ))}
       </div>
-
-      {/* Recent payments */}
-      <Card className="mt-8">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CreditCard className="h-5 w-5" />
-            Derniers paiements
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!recentPayments || recentPayments.length === 0 ? (
-            <p className="text-muted-foreground text-sm py-4 text-center">
-              Aucun paiement enregistre pour le moment.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {recentPayments.map((payment) => (
-                <div
-                  key={payment.id}
-                  className="flex items-center justify-between py-2 border-b last:border-0"
-                >
-                  <div>
-                    <p className="font-medium text-sm">
-                      {(payment.leases as Record<string, unknown>)?.tenants
-                        ? `${((payment.leases as Record<string, unknown>).tenants as Record<string, string>).first_name} ${((payment.leases as Record<string, unknown>).tenants as Record<string, string>).last_name}`
-                        : "Locataire"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(payment.paid_date ?? payment.due_date).toLocaleDateString("fr-FR")}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-sm">
-                      {payment.amount.toLocaleString("fr-FR")} FCFA
-                    </p>
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full ${
-                        payment.status === "PAID"
-                          ? "bg-green-100 text-green-700"
-                          : payment.status === "LATE"
-                          ? "bg-red-100 text-red-700"
-                          : "bg-yellow-100 text-yellow-700"
-                      }`}
-                    >
-                      {payment.status === "PAID"
-                        ? "Paye"
-                        : payment.status === "LATE"
-                        ? "En retard"
-                        : "En attente"}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }
