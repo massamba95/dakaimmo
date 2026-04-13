@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DeleteButton } from "@/components/dashboard/delete-button";
-import { ArrowLeft, MapPin, Home, Ruler, DoorOpen, Pencil, Share2, MessageCircle, Copy } from "lucide-react";
+import { ArrowLeft, MapPin, Home, Ruler, DoorOpen, Pencil, Share2, MessageCircle, Copy, UserSquare2, Phone, Mail } from "lucide-react";
 import { generateWhatsAppMessage, getWhatsAppShareUrl, generateFacebookPost } from "@/lib/whatsapp";
 import { toast } from "sonner";
 
@@ -18,14 +18,18 @@ interface Property {
   id: string;
   title: string;
   type: string;
+  listing_type: string;
   address: string;
   city: string;
   rooms: number | null;
   area: number | null;
   rent_amount: number;
   charges: number;
+  sale_price: number | null;
   status: string;
   photos: string[];
+  owner_id: string | null;
+  owners: { id: string; first_name: string; last_name: string; phone: string; email: string | null } | null;
 }
 
 interface LeaseWithTenant {
@@ -54,6 +58,7 @@ export default function PropertyDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const { role, orgName } = useOrg();
+  const canViewOwners = hasPermission(role, "owners:view");
   const canEdit = hasPermission(role, "properties:edit");
   const canDelete = hasPermission(role, "properties:delete");
   const [property, setProperty] = useState<Property | null>(null);
@@ -66,7 +71,7 @@ export default function PropertyDetailPage() {
 
       const { data: prop } = await supabase
         .from("properties")
-        .select("*")
+        .select("*, owners(id, first_name, last_name, phone, email)")
         .eq("id", id)
         .single();
 
@@ -204,6 +209,40 @@ export default function PropertyDetailPage() {
             </div>
           </CardContent>
         </Card>
+
+        {canViewOwners && property.owners && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserSquare2 className="h-5 w-5" />
+                Propriétaire du bien
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Link href={`/dashboard/owners/${property.owners.id}`} className="block p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <span className="text-sm font-bold text-primary">
+                      {property.owners.first_name[0]}{property.owners.last_name[0]}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="font-semibold">{property.owners.first_name} {property.owners.last_name}</p>
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground mt-0.5">
+                      <Phone className="h-3 w-3" />{property.owners.phone}
+                    </div>
+                    {property.owners.email && (
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <Mail className="h-3 w-3" />{property.owners.email}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <p className="text-xs text-primary mt-2">Voir tous ses biens →</p>
+              </Link>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader><CardTitle>Locataire actuel</CardTitle></CardHeader>

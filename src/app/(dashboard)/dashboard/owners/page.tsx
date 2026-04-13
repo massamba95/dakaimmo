@@ -98,10 +98,10 @@ export default function OwnersPage() {
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
           {filtered.map((owner) => (
-            <Card key={owner.id}>
+            <Card key={owner.id} className="hover:shadow-md transition-shadow">
               <CardContent className="pt-5 pb-4">
                 <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
+                  <Link href={`/dashboard/owners/${owner.id}`} className="flex items-center gap-3 flex-1 min-w-0">
                     <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                       <span className="text-sm font-bold text-primary">
                         {owner.first_name[0]}{owner.last_name[0]}
@@ -110,7 +110,7 @@ export default function OwnersPage() {
                     <div>
                       <p className="font-semibold">{owner.first_name} {owner.last_name}</p>
                     </div>
-                  </div>
+                  </Link>
                   <div className="flex gap-1">
                     {canEdit && (
                       <Link href={`/dashboard/owners/${owner.id}/edit`}>
@@ -122,7 +122,7 @@ export default function OwnersPage() {
                     )}
                   </div>
                 </div>
-                <div className="mt-3 space-y-1">
+                <Link href={`/dashboard/owners/${owner.id}`} className="block mt-3 space-y-1">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Phone className="h-4 w-4" />
                     {owner.phone}
@@ -136,7 +136,7 @@ export default function OwnersPage() {
                   {owner.notes && (
                     <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{owner.notes}</p>
                   )}
-                </div>
+                </Link>
               </CardContent>
             </Card>
           ))}
