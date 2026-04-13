@@ -46,8 +46,7 @@ export default function NewOwnerPage() {
     });
 
     if (error) {
-      console.error("Supabase error:", JSON.stringify(error));
-      toast.error(`Erreur: ${error.message} (code: ${error.code})`);
+      toast.error("Erreur lors de l'ajout.");
       setLoading(false);
       return;
     }
