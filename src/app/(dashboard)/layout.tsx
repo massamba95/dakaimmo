@@ -50,7 +50,7 @@ export default function DashboardLayout({
           <SidebarNav />
         </div>
         <main className="flex-1 bg-muted/30">
-          <div className="p-4 sm:p-6 lg:p-8">{children}</div>
+          <div className="p-4 pb-24 sm:p-6 lg:p-8 lg:pb-8">{children}</div>
         </main>
       </div>
     </div>

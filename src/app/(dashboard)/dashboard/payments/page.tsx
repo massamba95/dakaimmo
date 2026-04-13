@@ -193,83 +193,161 @@ export default function PaymentsPage() {
       ) : filtered.length === 0 ? (
         <p className="text-muted-foreground text-center py-12">Aucun resultat pour &quot;{search}&quot;</p>
       ) : (
-        <Card className="mt-6">
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Locataire</TableHead>
-                  <TableHead>Bien</TableHead>
-                  <TableHead>Montant</TableHead>
-                  <TableHead>Reste</TableHead>
-                  <TableHead>Echeance</TableHead>
-                  <TableHead>Methode</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((payment) => {
-                  const tenant = payment.leases?.tenants;
-                  const property = payment.leases?.properties;
-                  const status = statusConfig[payment.status];
-                  const remaining = getRemainingAmount(payment);
-                  const isCompleting = completing === payment.id;
-                  return (
-                    <TableRow key={payment.id}>
-                      <TableCell className="font-medium">{tenant?.first_name} {tenant?.last_name}</TableCell>
-                      <TableCell>{property?.title}</TableCell>
-                      <TableCell>{payment.amount.toLocaleString("fr-FR")} FCFA</TableCell>
-                      <TableCell>
-                        {payment.status === "PARTIAL" ? (
-                          <span className="text-red-600 font-medium">{remaining.toLocaleString("fr-FR")} FCFA</span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>{new Date(payment.due_date).toLocaleDateString("fr-FR")}</TableCell>
-                      <TableCell>{methodLabels[payment.method] ?? payment.method}</TableCell>
-                      <TableCell><Badge variant={status?.variant}>{status?.label}</Badge></TableCell>
-                      <TableCell>
-                        {payment.status === "PARTIAL" && canCreate && (
-                          isCompleting ? (
-                            <div className="flex items-center gap-2">
-                              <Input
-                                type="number"
-                                value={completeAmount}
-                                onChange={(e) => setCompleteAmount(e.target.value)}
-                                className="w-24 h-8 text-sm"
-                                placeholder="Montant"
-                              />
-                              <select
-                                className="h-8 rounded border border-input bg-background px-2 text-xs"
-                                value={completeMethod}
-                                onChange={(e) => setCompleteMethod(e.target.value)}
-                              >
-                                <option value="CASH">Especes</option>
-                                <option value="WAVE">Wave</option>
-                                <option value="ORANGE_MONEY">OM</option>
-                                <option value="TRANSFER">Virement</option>
-                              </select>
-                              <Button size="sm" onClick={() => handleComplete(payment)}>
-                                <CheckCircle2 className="h-3 w-3" />
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => setCompleting(null)}>x</Button>
-                            </div>
-                          ) : (
-                            <Button size="sm" variant="outline" onClick={() => handleComplete(payment)}>
-                              Completer
+        <>
+          {/* Cartes mobile */}
+          <div className="mt-6 space-y-3 md:hidden">
+            {filtered.map((payment) => {
+              const tenant = payment.leases?.tenants;
+              const property = payment.leases?.properties;
+              const status = statusConfig[payment.status];
+              const remaining = getRemainingAmount(payment);
+              const isCompleting = completing === payment.id;
+              return (
+                <Card key={payment.id}>
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <p className="font-semibold">{tenant?.first_name} {tenant?.last_name}</p>
+                        <p className="text-sm text-muted-foreground">{property?.title}</p>
+                      </div>
+                      <Badge variant={status?.variant}>{status?.label}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-sm mt-3">
+                      <span className="text-muted-foreground">Montant</span>
+                      <span className="font-bold">{payment.amount.toLocaleString("fr-FR")} FCFA</span>
+                    </div>
+                    {payment.status === "PARTIAL" && (
+                      <div className="flex items-center justify-between text-sm mt-1">
+                        <span className="text-muted-foreground">Reste</span>
+                        <span className="font-medium text-red-600">{remaining.toLocaleString("fr-FR")} FCFA</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-sm mt-1">
+                      <span className="text-muted-foreground">Echeance</span>
+                      <span>{new Date(payment.due_date).toLocaleDateString("fr-FR")}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm mt-1">
+                      <span className="text-muted-foreground">Methode</span>
+                      <span>{methodLabels[payment.method] ?? payment.method}</span>
+                    </div>
+                    {payment.status === "PARTIAL" && canCreate && (
+                      <div className="mt-3 pt-3 border-t">
+                        {isCompleting ? (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              value={completeAmount}
+                              onChange={(e) => setCompleteAmount(e.target.value)}
+                              className="flex-1 h-9 text-sm"
+                              placeholder="Montant"
+                            />
+                            <select
+                              className="h-9 rounded border border-input bg-background px-2 text-xs"
+                              value={completeMethod}
+                              onChange={(e) => setCompleteMethod(e.target.value)}
+                            >
+                              <option value="CASH">Especes</option>
+                              <option value="WAVE">Wave</option>
+                              <option value="ORANGE_MONEY">OM</option>
+                              <option value="TRANSFER">Virement</option>
+                            </select>
+                            <Button size="sm" onClick={() => handleComplete(payment)}>
+                              <CheckCircle2 className="h-4 w-4" />
                             </Button>
-                          )
+                            <Button size="sm" variant="outline" onClick={() => setCompleting(null)}>x</Button>
+                          </div>
+                        ) : (
+                          <Button size="sm" variant="outline" className="w-full" onClick={() => handleComplete(payment)}>
+                            Completer le paiement
+                          </Button>
                         )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Table desktop */}
+          <Card className="mt-6 hidden md:block">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Locataire</TableHead>
+                    <TableHead>Bien</TableHead>
+                    <TableHead>Montant</TableHead>
+                    <TableHead>Reste</TableHead>
+                    <TableHead>Echeance</TableHead>
+                    <TableHead>Methode</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((payment) => {
+                    const tenant = payment.leases?.tenants;
+                    const property = payment.leases?.properties;
+                    const status = statusConfig[payment.status];
+                    const remaining = getRemainingAmount(payment);
+                    const isCompleting = completing === payment.id;
+                    return (
+                      <TableRow key={payment.id}>
+                        <TableCell className="font-medium">{tenant?.first_name} {tenant?.last_name}</TableCell>
+                        <TableCell>{property?.title}</TableCell>
+                        <TableCell>{payment.amount.toLocaleString("fr-FR")} FCFA</TableCell>
+                        <TableCell>
+                          {payment.status === "PARTIAL" ? (
+                            <span className="text-red-600 font-medium">{remaining.toLocaleString("fr-FR")} FCFA</span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>{new Date(payment.due_date).toLocaleDateString("fr-FR")}</TableCell>
+                        <TableCell>{methodLabels[payment.method] ?? payment.method}</TableCell>
+                        <TableCell><Badge variant={status?.variant}>{status?.label}</Badge></TableCell>
+                        <TableCell>
+                          {payment.status === "PARTIAL" && canCreate && (
+                            isCompleting ? (
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="number"
+                                  value={completeAmount}
+                                  onChange={(e) => setCompleteAmount(e.target.value)}
+                                  className="w-24 h-8 text-sm"
+                                  placeholder="Montant"
+                                />
+                                <select
+                                  className="h-8 rounded border border-input bg-background px-2 text-xs"
+                                  value={completeMethod}
+                                  onChange={(e) => setCompleteMethod(e.target.value)}
+                                >
+                                  <option value="CASH">Especes</option>
+                                  <option value="WAVE">Wave</option>
+                                  <option value="ORANGE_MONEY">OM</option>
+                                  <option value="TRANSFER">Virement</option>
+                                </select>
+                                <Button size="sm" onClick={() => handleComplete(payment)}>
+                                  <CheckCircle2 className="h-3 w-3" />
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => setCompleting(null)}>x</Button>
+                              </div>
+                            ) : (
+                              <Button size="sm" variant="outline" onClick={() => handleComplete(payment)}>
+                                Completer
+                              </Button>
+                            )
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </>
       )}
     </div>
   );

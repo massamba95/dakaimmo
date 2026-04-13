@@ -20,7 +20,7 @@ import {
   LogOut,
   UsersRound,
   History,
-  Menu,
+  MoreHorizontal,
   X,
 } from "lucide-react";
 
@@ -36,21 +36,32 @@ export function MobileNav() {
   const pathname = usePathname();
   const router = useRouter();
   const { orgName, role, loading } = useOrg();
-  const [open, setOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
-  const navItems: { href: string; label: string; icon: typeof LayoutDashboard; permission: Permission | null }[] = [
-    { href: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard, permission: null },
-    { href: "/dashboard/properties", label: "Mes biens", icon: Home, permission: "properties:view" },
+  const mainTabs: { href: string; label: string; icon: typeof LayoutDashboard; permission: Permission | null }[] = [
+    { href: "/dashboard", label: "Accueil", icon: LayoutDashboard, permission: null },
+    { href: "/dashboard/properties", label: "Biens", icon: Home, permission: "properties:view" },
     { href: "/dashboard/tenants", label: "Locataires", icon: Users, permission: "tenants:view" },
-    { href: "/dashboard/leases", label: "Baux", icon: FileText, permission: "leases:view" },
     { href: "/dashboard/payments", label: "Paiements", icon: CreditCard, permission: "payments:view" },
+  ];
+
+  const moreItems: { href: string; label: string; icon: typeof LayoutDashboard; permission: Permission | null }[] = [
+    { href: "/dashboard/leases", label: "Baux", icon: FileText, permission: "leases:view" },
     { href: "/dashboard/activity", label: "Historique", icon: History, permission: "team:manage" },
     { href: "/dashboard/team", label: "Equipe", icon: UsersRound, permission: "team:manage" },
     { href: "/dashboard/settings", label: "Parametres", icon: Settings, permission: null },
   ];
 
-  const visibleItems = navItems.filter(
+  const visibleMain = mainTabs.filter(
     (item) => !item.permission || hasPermission(role, item.permission)
+  );
+
+  const visibleMore = moreItems.filter(
+    (item) => !item.permission || hasPermission(role, item.permission)
+  );
+
+  const isMoreActive = visibleMore.some(
+    (item) => pathname === item.href || pathname.startsWith(item.href)
   );
 
   async function handleLogout() {
@@ -61,29 +72,35 @@ export function MobileNav() {
 
   return (
     <>
-      {/* Mobile header */}
+      {/* Header mobile minimal */}
       <header className="lg:hidden sticky top-0 z-50 bg-card border-b px-4 h-14 flex items-center justify-between">
         <Link href="/dashboard" className="flex items-center gap-2">
           <Building2 className="h-6 w-6 text-primary" />
           <span className="font-bold">Jappalé Immo</span>
         </Link>
-        <Button variant="ghost" size="sm" onClick={() => setOpen(!open)}>
-          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </Button>
+        {!loading && orgName && (
+          <p className="text-sm text-muted-foreground truncate max-w-[160px]">{orgName}</p>
+        )}
       </header>
 
-      {/* Mobile menu overlay */}
-      {open && (
-        <div className="lg:hidden fixed inset-0 top-14 z-40 bg-background">
-          <div className="p-4">
-            {!loading && orgName && (
-              <div className="mb-4 pb-4 border-b">
-                <p className="font-medium">{orgName}</p>
-                <p className="text-sm text-muted-foreground">{roleLabels[role ?? ""]}</p>
-              </div>
-            )}
-            <nav className="space-y-1">
-              {visibleItems.map((item) => {
+      {/* Overlay "Plus" */}
+      {moreOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-40 bg-black/40"
+          onClick={() => setMoreOpen(false)}
+        >
+          <div
+            className="absolute bottom-16 left-0 right-0 bg-card rounded-t-2xl p-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <p className="font-semibold">Menu</p>
+              <Button variant="ghost" size="sm" onClick={() => setMoreOpen(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <nav className="grid grid-cols-2 gap-2">
+              {visibleMore.map((item) => {
                 const isActive =
                   pathname === item.href ||
                   (item.href !== "/dashboard" && pathname.startsWith(item.href));
@@ -91,12 +108,12 @@ export function MobileNav() {
                   <Link
                     key={item.href}
                     href={item.href}
-                    onClick={() => setOpen(false)}
+                    onClick={() => setMoreOpen(false)}
                     className={cn(
-                      "flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors",
+                      "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors",
                       isActive
                         ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        : "bg-muted hover:bg-muted/80 text-foreground"
                     )}
                   >
                     <item.icon className="h-5 w-5" />
@@ -105,7 +122,7 @@ export function MobileNav() {
                 );
               })}
             </nav>
-            <div className="mt-6 pt-4 border-t">
+            <div className="mt-3 pt-3 border-t">
               <Button
                 variant="ghost"
                 className="w-full justify-start gap-3 text-muted-foreground"
@@ -118,6 +135,38 @@ export function MobileNav() {
           </div>
         </div>
       )}
+
+      {/* Barre de navigation en bas */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t flex items-center safe-area-bottom">
+        {visibleMain.map((item) => {
+          const isActive =
+            pathname === item.href ||
+            (item.href !== "/dashboard" && pathname.startsWith(item.href));
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex-1 flex flex-col items-center justify-center py-2 gap-1 text-xs font-medium transition-colors",
+                isActive ? "text-primary" : "text-muted-foreground"
+              )}
+            >
+              <item.icon className={cn("h-5 w-5", isActive && "stroke-[2.5]")} />
+              {item.label}
+            </Link>
+          );
+        })}
+        <button
+          className={cn(
+            "flex-1 flex flex-col items-center justify-center py-2 gap-1 text-xs font-medium transition-colors",
+            isMoreActive ? "text-primary" : "text-muted-foreground"
+          )}
+          onClick={() => setMoreOpen(!moreOpen)}
+        >
+          <MoreHorizontal className={cn("h-5 w-5", isMoreActive && "stroke-[2.5]")} />
+          Plus
+        </button>
+      </nav>
     </>
   );
 }
