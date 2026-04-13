@@ -2,12 +2,15 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useOrg } from "@/lib/hooks/use-org";
 import { hasPermission } from "@/lib/permissions";
+import { logActivity } from "@/lib/activity-log";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { SearchBar } from "@/components/dashboard/search-bar";
 import {
   Table,
@@ -17,16 +20,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, CreditCard } from "lucide-react";
+import { Plus, CreditCard, CheckCircle2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface Payment {
   id: string;
+  lease_id: string;
   amount: number;
   due_date: string;
   paid_date: string | null;
   method: string;
   status: string;
   leases: {
+    rent_amount: number;
     tenants: { first_name: string; last_name: string } | null;
     properties: { title: string } | null;
   } | null;
@@ -47,28 +53,96 @@ const methodLabels: Record<string, string> = {
 };
 
 export default function PaymentsPage() {
-  const { orgId, role } = useOrg();
+  const router = useRouter();
+  const { orgId, role, userId, userName } = useOrg();
   const canCreate = hasPermission(role, "payments:create");
   const [payments, setPayments] = useState<Payment[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [completing, setCompleting] = useState<string | null>(null);
+  const [completeAmount, setCompleteAmount] = useState("");
+  const [completeMethod, setCompleteMethod] = useState("CASH");
 
   useEffect(() => {
     if (!orgId) return;
-    async function load() {
-      const supabase = createClient();
-
-      const { data } = await supabase
-        .from("payments")
-        .select("*, leases(tenants(first_name, last_name), properties!inner(title, org_id))")
-        .eq("leases.properties.org_id", orgId!)
-        .order("created_at", { ascending: false });
-
-      setPayments((data as Payment[]) ?? []);
-      setLoading(false);
-    }
-    load();
+    loadPayments();
   }, [orgId]);
+
+  async function loadPayments() {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("payments")
+      .select("*, leases(rent_amount, tenants(first_name, last_name), properties!inner(title, org_id))")
+      .eq("leases.properties.org_id", orgId!)
+      .order("created_at", { ascending: false });
+
+    setPayments((data as Payment[]) ?? []);
+    setLoading(false);
+  }
+
+  function getRemainingAmount(payment: Payment): number {
+    if (payment.status !== "PARTIAL" || !payment.leases) return 0;
+    return payment.leases.rent_amount - payment.amount;
+  }
+
+  async function handleComplete(payment: Payment) {
+    if (completing !== payment.id) {
+      const remaining = getRemainingAmount(payment);
+      setCompleting(payment.id);
+      setCompleteAmount(remaining.toString());
+      setCompleteMethod("CASH");
+      return;
+    }
+
+    const amount = parseInt(completeAmount);
+    if (!amount || amount <= 0) {
+      toast.error("Montant invalide.");
+      return;
+    }
+
+    const supabase = createClient();
+    const remaining = getRemainingAmount(payment);
+    const totalAfter = payment.amount + amount;
+    const rentAmount = payment.leases?.rent_amount ?? 0;
+
+    // Creer le paiement complementaire
+    const { error } = await supabase.from("payments").insert({
+      lease_id: payment.lease_id,
+      amount: amount,
+      due_date: payment.due_date,
+      paid_date: new Date().toISOString().split("T")[0],
+      method: completeMethod,
+      status: totalAfter >= rentAmount ? "PAID" : "PARTIAL",
+    });
+
+    if (error) {
+      toast.error("Erreur lors de l'enregistrement.");
+      return;
+    }
+
+    // Si le total est complet, mettre a jour le paiement original en PAID
+    if (totalAfter >= rentAmount) {
+      await supabase
+        .from("payments")
+        .update({ status: "PAID" })
+        .eq("id", payment.id);
+    }
+
+    if (orgId && userId) {
+      await logActivity({
+        orgId, userId,
+        userName: userName ?? "Utilisateur",
+        action: "CREATE",
+        entityType: "PAYMENT",
+        entityName: `${payment.leases?.tenants?.first_name ?? ""} ${payment.leases?.tenants?.last_name ?? ""}`,
+        details: `Complement - ${amount.toLocaleString("fr-FR")} FCFA (reste: ${Math.max(0, remaining - amount).toLocaleString("fr-FR")} FCFA)`,
+      });
+    }
+
+    toast.success("Complement enregistre !");
+    setCompleting(null);
+    loadPayments();
+  }
 
   const filtered = payments.filter((p) => {
     const q = search.toLowerCase();
@@ -127,9 +201,11 @@ export default function PaymentsPage() {
                   <TableHead>Locataire</TableHead>
                   <TableHead>Bien</TableHead>
                   <TableHead>Montant</TableHead>
+                  <TableHead>Reste</TableHead>
                   <TableHead>Echeance</TableHead>
                   <TableHead>Methode</TableHead>
                   <TableHead>Statut</TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -137,14 +213,56 @@ export default function PaymentsPage() {
                   const tenant = payment.leases?.tenants;
                   const property = payment.leases?.properties;
                   const status = statusConfig[payment.status];
+                  const remaining = getRemainingAmount(payment);
+                  const isCompleting = completing === payment.id;
                   return (
                     <TableRow key={payment.id}>
                       <TableCell className="font-medium">{tenant?.first_name} {tenant?.last_name}</TableCell>
                       <TableCell>{property?.title}</TableCell>
                       <TableCell>{payment.amount.toLocaleString("fr-FR")} FCFA</TableCell>
+                      <TableCell>
+                        {payment.status === "PARTIAL" ? (
+                          <span className="text-red-600 font-medium">{remaining.toLocaleString("fr-FR")} FCFA</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                       <TableCell>{new Date(payment.due_date).toLocaleDateString("fr-FR")}</TableCell>
                       <TableCell>{methodLabels[payment.method] ?? payment.method}</TableCell>
                       <TableCell><Badge variant={status?.variant}>{status?.label}</Badge></TableCell>
+                      <TableCell>
+                        {payment.status === "PARTIAL" && canCreate && (
+                          isCompleting ? (
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                value={completeAmount}
+                                onChange={(e) => setCompleteAmount(e.target.value)}
+                                className="w-24 h-8 text-sm"
+                                placeholder="Montant"
+                              />
+                              <select
+                                className="h-8 rounded border border-input bg-background px-2 text-xs"
+                                value={completeMethod}
+                                onChange={(e) => setCompleteMethod(e.target.value)}
+                              >
+                                <option value="CASH">Especes</option>
+                                <option value="WAVE">Wave</option>
+                                <option value="ORANGE_MONEY">OM</option>
+                                <option value="TRANSFER">Virement</option>
+                              </select>
+                              <Button size="sm" onClick={() => handleComplete(payment)}>
+                                <CheckCircle2 className="h-3 w-3" />
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => setCompleting(null)}>x</Button>
+                            </div>
+                          ) : (
+                            <Button size="sm" variant="outline" onClick={() => handleComplete(payment)}>
+                              Completer
+                            </Button>
+                          )
+                        )}
+                      </TableCell>
                     </TableRow>
                   );
                 })}
