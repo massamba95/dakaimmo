@@ -10,7 +10,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DeleteButton } from "@/components/dashboard/delete-button";
-import { ArrowLeft, MapPin, Home, Ruler, DoorOpen, Pencil } from "lucide-react";
+import { ArrowLeft, MapPin, Home, Ruler, DoorOpen, Pencil, Share2, MessageCircle, Copy } from "lucide-react";
+import { generateWhatsAppMessage, getWhatsAppShareUrl, generateFacebookPost } from "@/lib/whatsapp";
+import { toast } from "sonner";
 
 interface Property {
   id: string;
@@ -51,7 +53,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
 export default function PropertyDetailPage() {
   const params = useParams();
   const id = params.id as string;
-  const { role } = useOrg();
+  const { role, orgName } = useOrg();
   const canEdit = hasPermission(role, "properties:edit");
   const canDelete = hasPermission(role, "properties:delete");
   const [property, setProperty] = useState<Property | null>(null);
@@ -122,6 +124,44 @@ export default function PropertyDetailPage() {
             <img key={i} src={url} alt={`Photo ${i + 1}`} className="h-48 w-72 object-cover rounded-lg border" />
           ))}
         </div>
+      )}
+
+      {/* Boutons de partage */}
+      {property.status === "AVAILABLE" && (
+        <Card className="mt-6">
+          <CardContent className="pt-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <Share2 className="h-5 w-5 text-muted-foreground shrink-0" />
+              <span className="text-sm font-medium">Diffuser cette annonce :</span>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={() => {
+                    const msg = generateWhatsAppMessage(property, orgName ?? "");
+                    const url = getWhatsAppShareUrl(msg);
+                    window.open(url, "_blank");
+                  }}
+                >
+                  <MessageCircle className="h-4 w-4 mr-1" />
+                  WhatsApp
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const post = generateFacebookPost(property, orgName ?? "");
+                    navigator.clipboard.writeText(post);
+                    toast.success("Annonce copiee ! Collez-la sur Facebook ou Instagram.");
+                  }}
+                >
+                  <Copy className="h-4 w-4 mr-1" />
+                  Copier pour Facebook / Instagram
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       <div className="grid md:grid-cols-2 gap-6 mt-8">
