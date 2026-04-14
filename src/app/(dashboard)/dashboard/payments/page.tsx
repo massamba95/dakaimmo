@@ -20,8 +20,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, CreditCard, CheckCircle2 } from "lucide-react";
+import { Plus, CreditCard, CheckCircle2, FileDown } from "lucide-react";
 import { toast } from "sonner";
+import { generateQuittancePDF } from "@/lib/pdf/quittance";
 
 interface Payment {
   id: string;
@@ -33,8 +34,9 @@ interface Payment {
   status: string;
   leases: {
     rent_amount: number;
-    tenants: { first_name: string; last_name: string } | null;
-    properties: { title: string } | null;
+    charges: number;
+    tenants: { first_name: string; last_name: string; phone: string } | null;
+    properties: { title: string; address: string; city: string; org_id: string } | null;
   } | null;
 }
 
@@ -54,7 +56,7 @@ const methodLabels: Record<string, string> = {
 
 export default function PaymentsPage() {
   const router = useRouter();
-  const { orgId, role, userId, userName } = useOrg();
+  const { orgId, orgName, role, userId, userName } = useOrg();
   const canCreate = hasPermission(role, "payments:create");
   const [payments, setPayments] = useState<Payment[]>([]);
   const [search, setSearch] = useState("");
@@ -72,7 +74,7 @@ export default function PaymentsPage() {
     const supabase = createClient();
     const { data } = await supabase
       .from("payments")
-      .select("*, leases(rent_amount, tenants(first_name, last_name), properties!inner(title, org_id))")
+      .select("*, leases(rent_amount, charges, tenants(first_name, last_name, phone), properties!inner(title, address, city, org_id))")
       .eq("leases.properties.org_id", orgId!)
       .order("created_at", { ascending: false });
 
@@ -142,6 +144,27 @@ export default function PaymentsPage() {
     toast.success("Complement enregistre !");
     setCompleting(null);
     loadPayments();
+  }
+
+  function handleDownloadQuittance(payment: Payment) {
+    const lease = payment.leases;
+    if (!lease) return;
+    generateQuittancePDF({
+      orgName: orgName ?? "Jappalé Immo",
+      paymentId: payment.id,
+      amount: payment.amount,
+      dueDate: payment.due_date,
+      paidDate: payment.paid_date,
+      method: payment.method,
+      rentAmount: lease.rent_amount,
+      charges: lease.charges ?? 0,
+      tenantFirstName: lease.tenants?.first_name ?? "",
+      tenantLastName: lease.tenants?.last_name ?? "",
+      tenantPhone: lease.tenants?.phone ?? "",
+      propertyTitle: lease.properties?.title ?? "",
+      propertyAddress: lease.properties?.address ?? "",
+      propertyCity: lease.properties?.city ?? "",
+    });
   }
 
   const filtered = payments.filter((p) => {
@@ -263,6 +286,19 @@ export default function PaymentsPage() {
                         )}
                       </div>
                     )}
+                    {payment.status === "PAID" && (
+                      <div className="mt-3 pt-3 border-t">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full gap-2"
+                          onClick={() => handleDownloadQuittance(payment)}
+                        >
+                          <FileDown className="h-4 w-4" />
+                          Télécharger la quittance
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               );
@@ -308,37 +344,50 @@ export default function PaymentsPage() {
                         <TableCell>{methodLabels[payment.method] ?? payment.method}</TableCell>
                         <TableCell><Badge variant={status?.variant}>{status?.label}</Badge></TableCell>
                         <TableCell>
-                          {payment.status === "PARTIAL" && canCreate && (
-                            isCompleting ? (
-                              <div className="flex items-center gap-2">
-                                <Input
-                                  type="number"
-                                  value={completeAmount}
-                                  onChange={(e) => setCompleteAmount(e.target.value)}
-                                  className="w-24 h-8 text-sm"
-                                  placeholder="Montant"
-                                />
-                                <select
-                                  className="h-8 rounded border border-input bg-background px-2 text-xs"
-                                  value={completeMethod}
-                                  onChange={(e) => setCompleteMethod(e.target.value)}
-                                >
-                                  <option value="CASH">Especes</option>
-                                  <option value="WAVE">Wave</option>
-                                  <option value="ORANGE_MONEY">OM</option>
-                                  <option value="TRANSFER">Virement</option>
-                                </select>
-                                <Button size="sm" onClick={() => handleComplete(payment)}>
-                                  <CheckCircle2 className="h-3 w-3" />
+                          <div className="flex items-center gap-2">
+                            {payment.status === "PARTIAL" && canCreate && (
+                              isCompleting ? (
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="number"
+                                    value={completeAmount}
+                                    onChange={(e) => setCompleteAmount(e.target.value)}
+                                    className="w-24 h-8 text-sm"
+                                    placeholder="Montant"
+                                  />
+                                  <select
+                                    className="h-8 rounded border border-input bg-background px-2 text-xs"
+                                    value={completeMethod}
+                                    onChange={(e) => setCompleteMethod(e.target.value)}
+                                  >
+                                    <option value="CASH">Especes</option>
+                                    <option value="WAVE">Wave</option>
+                                    <option value="ORANGE_MONEY">OM</option>
+                                    <option value="TRANSFER">Virement</option>
+                                  </select>
+                                  <Button size="sm" onClick={() => handleComplete(payment)}>
+                                    <CheckCircle2 className="h-3 w-3" />
+                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={() => setCompleting(null)}>x</Button>
+                                </div>
+                              ) : (
+                                <Button size="sm" variant="outline" onClick={() => handleComplete(payment)}>
+                                  Completer
                                 </Button>
-                                <Button size="sm" variant="outline" onClick={() => setCompleting(null)}>x</Button>
-                              </div>
-                            ) : (
-                              <Button size="sm" variant="outline" onClick={() => handleComplete(payment)}>
-                                Completer
+                              )
+                            )}
+                            {payment.status === "PAID" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1.5"
+                                onClick={() => handleDownloadQuittance(payment)}
+                              >
+                                <FileDown className="h-3.5 w-3.5" />
+                                Quittance
                               </Button>
-                            )
-                          )}
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
