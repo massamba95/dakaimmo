@@ -18,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, FileText, Pencil, Trash2 } from "lucide-react";
+import { Plus, FileText, Pencil, Trash2, Eye } from "lucide-react";
 import { toast } from "sonner";
 
 interface Lease {
@@ -28,8 +28,14 @@ interface Lease {
   end_date: string | null;
   rent_amount: number;
   status: string;
+  created_at: string;
   properties: { title: string; user_id: string } | null;
   tenants: { first_name: string; last_name: string } | null;
+}
+
+function leaseNumber(id: string, createdAt: string): string {
+  const year = new Date(createdAt).getFullYear();
+  return `BAI-${year}-${id.slice(0, 6).toUpperCase()}`;
 }
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
@@ -169,10 +175,10 @@ export default function LeasesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>N° Contrat</TableHead>
                   <TableHead>Bien</TableHead>
                   <TableHead>Locataire</TableHead>
                   <TableHead>Debut</TableHead>
-                  <TableHead>Fin</TableHead>
                   <TableHead>Loyer</TableHead>
                   <TableHead>Statut</TableHead>
                   <TableHead>Actions</TableHead>
@@ -183,14 +189,17 @@ export default function LeasesPage() {
                   const status = statusConfig[lease.status];
                   return (
                     <TableRow key={lease.id}>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{leaseNumber(lease.id, lease.created_at)}</TableCell>
                       <TableCell className="font-medium">{lease.properties?.title}</TableCell>
                       <TableCell>{lease.tenants?.first_name} {lease.tenants?.last_name}</TableCell>
                       <TableCell>{new Date(lease.start_date).toLocaleDateString("fr-FR")}</TableCell>
-                      <TableCell>{lease.end_date ? new Date(lease.end_date).toLocaleDateString("fr-FR") : "Indefini"}</TableCell>
                       <TableCell>{lease.rent_amount.toLocaleString("fr-FR")} FCFA</TableCell>
                       <TableCell><Badge variant={status?.variant}>{status?.label}</Badge></TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
+                          <Link href={`/dashboard/leases/${lease.id}`}>
+                            <Button variant="ghost" size="sm"><Eye className="h-4 w-4" /></Button>
+                          </Link>
                           {canEdit && (
                             <Link href={`/dashboard/leases/${lease.id}/edit`}>
                               <Button variant="ghost" size="sm"><Pencil className="h-4 w-4" /></Button>

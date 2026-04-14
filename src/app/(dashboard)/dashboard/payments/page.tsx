@@ -34,9 +34,8 @@ interface Payment {
   status: string;
   leases: {
     rent_amount: number;
-    charges: number;
     tenants: { first_name: string; last_name: string; phone: string } | null;
-    properties: { title: string; address: string; city: string; org_id: string } | null;
+    properties: { title: string; address: string; city: string; charges: number; org_id: string } | null;
   } | null;
 }
 
@@ -74,7 +73,7 @@ export default function PaymentsPage() {
     const supabase = createClient();
     const { data } = await supabase
       .from("payments")
-      .select("*, leases(rent_amount, charges, tenants(first_name, last_name, phone), properties!inner(title, address, city, org_id))")
+      .select("*, leases(rent_amount, tenants(first_name, last_name, phone), properties!inner(title, address, city, charges, org_id))")
       .eq("leases.properties.org_id", orgId!)
       .order("created_at", { ascending: false });
 
@@ -157,7 +156,7 @@ export default function PaymentsPage() {
       paidDate: payment.paid_date,
       method: payment.method,
       rentAmount: lease.rent_amount,
-      charges: lease.charges ?? 0,
+      charges: lease.properties?.charges ?? 0,
       tenantFirstName: lease.tenants?.first_name ?? "",
       tenantLastName: lease.tenants?.last_name ?? "",
       tenantPhone: lease.tenants?.phone ?? "",
