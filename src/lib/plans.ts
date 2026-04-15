@@ -13,15 +13,15 @@ export const PLANS = {
   },
   AGENCY: {
     label: "Agence",
-    maxProperties: 100,
+    maxProperties: 15,
     maxMembers: 10,
-    price: 15000,
+    price: 10000,
   },
   ENTERPRISE: {
     label: "Entreprise",
     maxProperties: 999999,
     maxMembers: 999999,
-    price: 30000,
+    price: 20000,
   },
 } as const;
 
