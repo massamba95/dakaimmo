@@ -55,10 +55,11 @@ const pricing = [
     price: "0",
     period: "FCFA/mois",
     features: [
-      "2 biens maximum",
+      "1 bien maximum",
+      "1 utilisateur",
       "Gestion des locataires",
       "Quittances PDF",
-      "Tableau de bord basique",
+      "Tableau de bord",
     ],
     cta: "Commencer gratuitement",
     popular: false,
@@ -68,24 +69,36 @@ const pricing = [
     price: "5 000",
     period: "FCFA/mois",
     features: [
-      "20 biens maximum",
-      "Toutes les fonctionnalites",
-      "Rappels automatiques",
-      "Paiement mobile",
-      "Support prioritaire",
+      "3 biens maximum",
+      "3 utilisateurs",
+      "Gestion d'equipe",
+      "Mini-site public",
+      "Historique d'activite",
     ],
     cta: "Essai gratuit 14 jours",
     popular: true,
   },
   {
     name: "Agence",
-    price: "15 000",
+    price: "10 000",
+    period: "FCFA/mois",
+    features: [
+      "15 biens maximum",
+      "10 utilisateurs",
+      "Toutes les fonctionnalites Pro",
+      "Support prioritaire",
+    ],
+    cta: "Essai gratuit 14 jours",
+    popular: false,
+  },
+  {
+    name: "Entreprise",
+    price: "20 000",
     period: "FCFA/mois",
     features: [
       "Biens illimites",
-      "Multi-utilisateurs",
-      "Rapports avances",
-      "API access",
+      "Utilisateurs illimites",
+      "Toutes les fonctionnalites",
       "Support dedie",
     ],
     cta: "Nous contacter",
@@ -146,7 +159,7 @@ export default function HomePage() {
             </a>
           </div>
           <p className="mt-4 text-sm text-muted-foreground">
-            Gratuit jusqu&apos;a 2 biens. Aucune carte bancaire requise.
+            Gratuit jusqu&apos;a 1 bien. Aucune carte bancaire requise.
           </p>
         </div>
       </section>
@@ -186,7 +199,7 @@ export default function HomePage() {
           <p className="mt-4 text-center text-muted-foreground">
             Choisissez le plan adapte a votre besoin. Pas de frais caches.
           </p>
-          <div className="mt-16 grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <div className="mt-16 grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
             {pricing.map((plan) => (
               <div
                 key={plan.name}
