@@ -40,3 +40,9 @@ export function getTrialDaysLeft(trialEndsAt: string | null): number {
   const diff = new Date(trialEndsAt).getTime() - Date.now();
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 }
+
+export function getSubscriptionDaysLeft(endDate: string | null): number {
+  if (!endDate) return 0;
+  const diff = new Date(endDate).getTime() - Date.now();
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+}

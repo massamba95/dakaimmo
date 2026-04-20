@@ -9,8 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
-import { CheckCircle, Clock, Home, Users, CreditCard } from "lucide-react";
+import { CheckCircle, Clock, Home, Users, CreditCard, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { getSubscriptionDaysLeft } from "@/lib/plans";
 
 type PlanKey = "FREE" | "PRO" | "AGENCY" | "ENTERPRISE";
 const PLAN_ORDER: PlanKey[] = ["FREE", "PRO", "AGENCY", "ENTERPRISE"];
@@ -29,6 +30,8 @@ export default function UpgradePage() {
   const [transactionRef, setTransactionRef] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [pendingRequest, setPendingRequest] = useState(false);
+  const [daysLeft, setDaysLeft] = useState<number | null>(null);
+  const [subEndDate, setSubEndDate] = useState<string | null>(null);
 
   const wavePhone  = process.env.NEXT_PUBLIC_WAVE_PHONE ?? "";
   const omPhone    = process.env.NEXT_PUBLIC_OM_PHONE  ?? "";
@@ -38,17 +41,29 @@ export default function UpgradePage() {
 
   useEffect(() => {
     if (!orgId) return;
-    async function checkPending() {
+    async function checkSubscriptions() {
       const supabase = createClient();
-      const { data } = await supabase
-        .from("subscriptions")
-        .select("id")
-        .eq("org_id", orgId!)
-        .eq("status", "PENDING_VALIDATION")
-        .limit(1);
-      if (data && data.length > 0) setPendingRequest(true);
+      const [{ data: pending }, { data: active }] = await Promise.all([
+        supabase
+          .from("subscriptions")
+          .select("id")
+          .eq("org_id", orgId!)
+          .eq("status", "PENDING_VALIDATION")
+          .limit(1),
+        supabase
+          .from("subscriptions")
+          .select("current_period_end")
+          .eq("org_id", orgId!)
+          .eq("status", "ACTIVE")
+          .single(),
+      ]);
+      if (pending && pending.length > 0) setPendingRequest(true);
+      if (active) {
+        setSubEndDate(active.current_period_end);
+        setDaysLeft(getSubscriptionDaysLeft(active.current_period_end));
+      }
     }
-    checkPending();
+    checkSubscriptions();
   }, [orgId]);
 
   async function handleSubmit() {
@@ -97,12 +112,23 @@ export default function UpgradePage() {
       {/* Plan actuel */}
       <div className="mt-6 p-4 bg-primary/5 border border-primary/20 rounded-lg flex items-center gap-3">
         <CreditCard className="h-5 w-5 text-primary shrink-0" />
-        <p className="text-sm">
-          Plan actuel :{" "}
-          <span className="font-bold text-primary">
-            {PLANS[currentPlan]?.label}
-          </span>
-        </p>
+        <div>
+          <p className="text-sm">
+            Plan actuel :{" "}
+            <span className="font-bold text-primary">{PLANS[currentPlan]?.label}</span>
+          </p>
+          {currentPlan !== "FREE" && daysLeft !== null && (
+            <p className={`text-xs mt-0.5 flex items-center gap-1 ${
+              daysLeft <= 3 ? "text-red-600" : daysLeft <= 7 ? "text-yellow-600" : "text-muted-foreground"
+            }`}>
+              {daysLeft <= 3 && <AlertTriangle className="h-3 w-3" />}
+              {daysLeft === 0
+                ? "Abonnement expiré"
+                : `Expire dans ${daysLeft} jour${daysLeft > 1 ? "s" : ""} · ${subEndDate}`
+              }
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Cartes plans */}
@@ -164,7 +190,7 @@ export default function UpgradePage() {
                   </div>
                 )}
 
-                {isAdmin && isUpgrade && !isCurrent && plan.price > 0 && (
+                {isAdmin && plan.price > 0 && (isUpgrade || (isCurrent && daysLeft !== null && daysLeft <= 7)) && (
                   <Button
                     className="w-full mt-2"
                     size="sm"
@@ -172,7 +198,7 @@ export default function UpgradePage() {
                     onClick={() => setSelectedPlan(isSelected ? null : planKey)}
                     disabled={pendingRequest}
                   >
-                    {isSelected ? "Annuler" : "Choisir"}
+                    {isSelected ? "Annuler" : isCurrent ? "Renouveler" : "Choisir"}
                   </Button>
                 )}
 

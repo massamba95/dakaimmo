@@ -276,7 +276,7 @@ export function generateQuittancePDF(data: QuittanceData): void {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
   doc.setTextColor(...muted);
-  doc.text("Ce document est généré automatiquement par Jappalé Immo · jappaleimmo.vercel.app", pageW / 2, footerY + 5, { align: "center" });
+  doc.text("Ce document est généré automatiquement par Jappalé Immo · jappaleimmo.com", pageW / 2, footerY + 5, { align: "center" });
   doc.text("Document non modifiable — valable comme quittance de loyer", pageW / 2, footerY + 9, { align: "center" });
 
   // ── Téléchargement ──────────────────────────────────────

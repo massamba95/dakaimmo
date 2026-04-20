@@ -21,6 +21,7 @@ export default function RegisterPage() {
     firstName: "",
     lastName: "",
     phone: "",
+    address: "",
     email: "",
     password: "",
     confirmPassword: "",
@@ -84,6 +85,7 @@ export default function RegisterPage() {
           first_name: formData.firstName,
           last_name: formData.lastName,
           phone: formData.phone,
+          address: formData.address,
         },
       },
     });
@@ -287,6 +289,10 @@ export default function RegisterPage() {
             <div className="space-y-2">
               <Label htmlFor="phone">Telephone</Label>
               <Input id="phone" type="tel" placeholder="+221 77 123 45 67" value={formData.phone} onChange={(e) => updateField("phone", e.target.value)} required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="address">Adresse</Label>
+              <Input id="address" placeholder="Dakar, Sicap Liberté 6" value={formData.address} onChange={(e) => updateField("address", e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>

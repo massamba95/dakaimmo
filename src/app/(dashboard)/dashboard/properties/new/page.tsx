@@ -96,7 +96,10 @@ export default function NewPropertyPage() {
     });
 
     if (error) {
-      toast.error("Erreur lors de l'ajout du bien.");
+      const msg = error.message?.includes("Limite de")
+        ? error.message
+        : "Erreur lors de l'ajout du bien.";
+      toast.error(msg);
       setLoading(false);
       return;
     }

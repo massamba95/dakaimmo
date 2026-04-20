@@ -223,7 +223,7 @@ export function generateRapportPDF(data: RapportData): void {
   doc.setFontSize(7.5);
   doc.setTextColor(...muted);
   doc.text(
-    "Ce document est généré automatiquement par Jappalé Immo · jappaleimmo.vercel.app",
+    "Ce document est généré automatiquement par Jappalé Immo · jappaleimmo.com",
     pageW / 2, footerY + 5, { align: "center" }
   );
 

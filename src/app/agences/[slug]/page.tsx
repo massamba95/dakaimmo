@@ -102,7 +102,7 @@ export default async function AgencePublicPage({ params }: Props) {
         <p>
           Vitrine gérée via{" "}
           <a
-            href="https://jappaleimmo.vercel.app"
+            href="https://jappaleimmo.com"
             className="text-primary font-semibold hover:underline"
             target="_blank"
             rel="noopener noreferrer"

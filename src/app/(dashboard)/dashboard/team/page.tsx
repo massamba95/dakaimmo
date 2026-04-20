@@ -127,7 +127,10 @@ export default function TeamPage() {
       .eq("id", membershipId);
 
     if (error) {
-      toast.error("Erreur lors de l'approbation.");
+      const msg = error.message?.includes("Limite de")
+        ? error.message
+        : "Erreur lors de l'approbation.";
+      toast.error(msg);
     } else {
       toast.success("Membre approuve !");
       loadMembers();
@@ -172,6 +175,8 @@ export default function TeamPage() {
       if (error) {
         if (error.code === "23505") {
           toast.error("Cet utilisateur est deja membre de l'equipe.");
+        } else if (error.message?.includes("Limite de")) {
+          toast.error(error.message);
         } else {
           toast.error("Erreur lors de l'ajout du membre.");
         }

@@ -12,13 +12,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Building2, Users, Home, AlertTriangle, Clock } from "lucide-react";
+import { Building2, Users, Home, AlertTriangle, Clock, User, Mail, Phone, MapPin, X } from "lucide-react";
 
 function getDaysLeft(dateStr: string): number {
   const diff = new Date(dateStr).getTime() - Date.now();
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 import { toast } from "sonner";
+
+interface Owner {
+  id: string;
+  email: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  address: string | null;
+}
 
 interface Org {
   id: string;
@@ -34,6 +43,7 @@ interface Org {
   member_count: number;
   property_count: number;
   subscription_end: string | null;
+  owner: Owner | null;
 }
 
 const planLabels: Record<string, string> = {
@@ -65,6 +75,7 @@ export default function OrganisationsPage() {
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [updating, setUpdating] = useState<string | null>(null);
+  const [detailsOrg, setDetailsOrg] = useState<Org | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/organisations");
@@ -145,6 +156,7 @@ export default function OrganisationsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Organisation</TableHead>
+                  <TableHead>Propriétaire</TableHead>
                   <TableHead>Plan</TableHead>
                   <TableHead>Statut</TableHead>
                   <TableHead className="text-center">
@@ -165,6 +177,21 @@ export default function OrganisationsPage() {
                         <p className="font-medium">{org.name}</p>
                         <p className="text-xs text-muted-foreground">/{org.slug}</p>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      {org.owner ? (
+                        <button
+                          onClick={() => setDetailsOrg(org)}
+                          className="text-left hover:underline"
+                        >
+                          <p className="text-sm font-medium">
+                            {org.owner.first_name} {org.owner.last_name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{org.owner.email}</p>
+                        </button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <select
@@ -262,6 +289,83 @@ export default function OrganisationsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal détails propriétaire */}
+      {detailsOrg && detailsOrg.owner && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={() => setDetailsOrg(null)}
+        >
+          <Card
+            className="max-w-md w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Propriétaire
+              </CardTitle>
+              <button
+                onClick={() => setDetailsOrg(null)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Organisation</p>
+                <p className="font-semibold">{detailsOrg.name}</p>
+              </div>
+              <div className="border-t pt-4 space-y-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Nom complet</p>
+                  <p className="font-medium">
+                    {detailsOrg.owner.first_name} {detailsOrg.owner.last_name}
+                  </p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Mail className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Email</p>
+                    <a
+                      href={`mailto:${detailsOrg.owner.email}`}
+                      className="text-sm font-medium hover:underline break-all"
+                    >
+                      {detailsOrg.owner.email || "—"}
+                    </a>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Phone className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Téléphone</p>
+                    {detailsOrg.owner.phone ? (
+                      <a
+                        href={`tel:${detailsOrg.owner.phone}`}
+                        className="text-sm font-medium hover:underline"
+                      >
+                        {detailsOrg.owner.phone}
+                      </a>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">—</p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Adresse</p>
+                    <p className="text-sm font-medium">
+                      {detailsOrg.owner.address || "—"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

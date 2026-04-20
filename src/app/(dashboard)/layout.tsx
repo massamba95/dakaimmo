@@ -7,6 +7,8 @@ import { useOrg } from "@/lib/hooks/use-org";
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
 import { MobileNav } from "@/components/dashboard/mobile-nav";
 import { PendingApproval } from "@/components/dashboard/pending-approval";
+import { SubscriptionAlert } from "@/components/dashboard/subscription-alert";
+import { SubscriptionExpiredWall } from "@/components/dashboard/subscription-expired-wall";
 
 export default function DashboardLayout({
   children,
@@ -50,7 +52,10 @@ export default function DashboardLayout({
           <SidebarNav />
         </div>
         <main className="flex-1 bg-muted/30">
-          <div className="p-4 pb-24 sm:p-6 lg:p-8 lg:pb-8">{children}</div>
+          <SubscriptionExpiredWall>
+            <SubscriptionAlert />
+            <div className="p-4 pb-24 sm:p-6 lg:p-8 lg:pb-8">{children}</div>
+          </SubscriptionExpiredWall>
         </main>
       </div>
     </div>

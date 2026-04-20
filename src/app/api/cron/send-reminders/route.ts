@@ -1,6 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import nodemailer from "nodemailer";
 import { createAdminClient } from "@/lib/supabase/admin";
+
+async function sendViaResend(to: string, subject: string, html: string) {
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: "Jappalé Immo <noreply@jappaleimmo.com>",
+      to,
+      subject,
+      html,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Resend error (${res.status}): ${err}`);
+  }
+}
 
 // J0, J+3, puis toutes les semaines (J+7, J+14, J+21...)
 function shouldSendToday(dueDate: string, today: Date): boolean {
@@ -81,13 +100,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
-    },
-  });
+  if (!process.env.RESEND_API_KEY) {
+    return NextResponse.json({ error: "RESEND_API_KEY manquant" }, { status: 500 });
+  }
 
   const supabase = createAdminClient();
   const today = new Date();
@@ -148,15 +163,10 @@ export async function GET(req: NextRequest) {
     });
 
     try {
-      await transporter.sendMail({
-        from: `"Jappalé Immo" <${process.env.GMAIL_USER}>`,
-        to: tenant.email,
-        subject,
-        html,
-      });
+      await sendViaResend(tenant.email, subject, html);
       sent++;
-    } catch (err: any) {
-      lastError = err.message ?? String(err);
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err);
       skipped++;
     }
   }

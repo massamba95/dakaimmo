@@ -19,6 +19,7 @@ export default function SettingsPage() {
     first_name: "",
     last_name: "",
     phone: "",
+    address: "",
     email: "",
   });
   const [orgFormData, setOrgFormData] = useState({ name: "" });
@@ -36,6 +37,7 @@ export default function SettingsPage() {
           first_name: user.user_metadata?.first_name ?? "",
           last_name: user.user_metadata?.last_name ?? "",
           phone: user.user_metadata?.phone ?? "",
+          address: user.user_metadata?.address ?? "",
           email: user.email ?? "",
         });
       }
@@ -60,6 +62,7 @@ export default function SettingsPage() {
         first_name: formData.first_name,
         last_name: formData.last_name,
         phone: formData.phone,
+        address: formData.address,
       },
     });
     if (error) {
@@ -143,6 +146,10 @@ export default function SettingsPage() {
             <div className="space-y-2">
               <Label htmlFor="phone">Telephone</Label>
               <Input id="phone" type="tel" value={formData.phone} onChange={(e) => updateField("phone", e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="address">Adresse</Label>
+              <Input id="address" value={formData.address} onChange={(e) => updateField("address", e.target.value)} placeholder="Dakar, Sicap Liberté 6" />
             </div>
             <Button type="submit" disabled={loading}>{loading ? "Mise a jour..." : "Enregistrer"}</Button>
           </form>
