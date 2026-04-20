@@ -30,7 +30,7 @@ function ForgotPasswordForm() {
 
     const supabase = createClient();
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `https://jappaleimmo.com/api/auth/callback?next=/reset-password`,
+      redirectTo: `https://jappaleimmo.com/reset-password`,
     });
 
     if (error) {

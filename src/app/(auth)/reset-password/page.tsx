@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -17,6 +17,30 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    const code = new URLSearchParams(window.location.search).get("code");
+
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+        if (error) {
+          setError("Lien expiré ou invalide. Demandez un nouveau lien.");
+        } else {
+          setReady(true);
+        }
+      });
+    } else {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          setReady(true);
+        } else {
+          setError("Lien invalide. Demandez un nouveau lien de réinitialisation.");
+        }
+      });
+    }
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,7 +60,7 @@ export default function ResetPasswordPage() {
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
-      setError("Lien expiré ou invalide. Redemandez un nouveau lien.");
+      setError("Erreur lors de la mise à jour. Réessayez.");
       setLoading(false);
       return;
     }
@@ -78,33 +102,49 @@ export default function ResetPasswordPage() {
               {error && (
                 <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">
                   {error}
+                  {error.includes("invalide") && (
+                    <div className="mt-2">
+                      <Link href="/forgot-password" className="underline font-medium">
+                        Demander un nouveau lien →
+                      </Link>
+                    </div>
+                  )}
                 </div>
               )}
-              <div className="space-y-2">
-                <Label htmlFor="password">Nouveau mot de passe</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Minimum 6 caractères"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirm">Confirmer le mot de passe</Label>
-                <Input
-                  id="confirm"
-                  type="password"
-                  placeholder="Retapez le mot de passe"
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Mise à jour..." : "Enregistrer"}
-              </Button>
+              {!error && !ready && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Vérification du lien...
+                </p>
+              )}
+              {ready && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Nouveau mot de passe</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="Minimum 6 caractères"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm">Confirmer le mot de passe</Label>
+                    <Input
+                      id="confirm"
+                      type="password"
+                      placeholder="Retapez le mot de passe"
+                      value={confirm}
+                      onChange={(e) => setConfirm(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? "Mise à jour..." : "Enregistrer"}
+                  </Button>
+                </>
+              )}
             </form>
           )}
         </CardContent>
