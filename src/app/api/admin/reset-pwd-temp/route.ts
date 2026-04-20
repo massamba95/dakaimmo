@@ -16,9 +16,22 @@ export async function GET() {
     return NextResponse.json({ step: "findUser", error: "User not found", emails: list.users.map(u => u.email) });
   }
 
-  const { error } = await supabase.auth.admin.updateUserById(user.id, { password: "Education2019." });
-  if (error) {
-    return NextResponse.json({ step: "updateUser", error: error.message, userId: user.id }, { status: 500 });
+  // Appel REST direct pour voir l'erreur complète
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/admin/users/${user.id}`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        apikey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ password: "Education2019." }),
+    }
+  );
+  const body = await res.json();
+  if (!res.ok) {
+    return NextResponse.json({ step: "restUpdate", status: res.status, body }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true, message: "Mot de passe mis à jour", userId: user.id });
