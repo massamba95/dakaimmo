@@ -76,11 +76,7 @@ export default function PropertiesPage() {
   async function fetchProperties() {
     if (!orgId) return;
     const supabase = createClient();
-    const { data, error } = await supabase.from("properties").select("*").eq("org_id", orgId).order("created_at", { ascending: false });
-    if (error) {
-      console.error("[properties] fetch error:", error);
-    }
-    console.log("[properties] loaded:", data?.length ?? 0, "for org", orgId);
+    const { data } = await supabase.from("properties").select("*").eq("org_id", orgId).order("created_at", { ascending: false });
     setProperties(data ?? []);
   }
 

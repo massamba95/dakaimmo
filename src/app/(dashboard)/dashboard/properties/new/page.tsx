@@ -134,8 +134,7 @@ export default function NewPropertyPage() {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    console.log("[new property] inserting with org_id:", orgId);
-    const { data: inserted, error } = await supabase.from("properties").insert({
+    const { error } = await supabase.from("properties").insert({
       user_id: user!.id,
       org_id: orgId,
       title: formData.title,
@@ -154,9 +153,7 @@ export default function NewPropertyPage() {
       floor: formData.floor ? parseInt(formData.floor) : null,
       status: "AVAILABLE",
       photos: photos,
-    }).select();
-
-    console.log("[new property] insert result:", { inserted, error });
+    });
 
     if (error) {
       const msg = error.message?.includes("Limite de")
