@@ -10,11 +10,17 @@ import { Building2, Home, CreditCard, Wrench, LogOut, UserCircle } from "lucide-
 
 type State = "loading" | "no-tenant" | "ready";
 
+interface Notifs {
+  latePayments: number;
+  issueUpdates: number;
+}
+
 export default function LocataireLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [state, setState] = useState<State>("loading");
   const [tenantName, setTenantName] = useState<string>("");
+  const [notifs, setNotifs] = useState<Notifs>({ latePayments: 0, issueUpdates: 0 });
 
   const isBienvenue = pathname === "/locataire/bienvenue";
 
@@ -46,6 +52,10 @@ export default function LocataireLayout({ children }: { children: React.ReactNod
 
       setTenantName(`${tenant.first_name ?? ""} ${tenant.last_name ?? ""}`.trim());
       setState("ready");
+      fetch("/api/locataire/notifications")
+        .then((r) => r.json())
+        .then((d) => { if (d.latePayments !== undefined) setNotifs(d); })
+        .catch(() => {});
     }
 
     check();
@@ -88,10 +98,10 @@ export default function LocataireLayout({ children }: { children: React.ReactNod
   }
 
   const navItems = [
-    { href: "/locataire", label: "Accueil", icon: Home, exact: true },
-    { href: "/locataire/paiements", label: "Mes paiements", icon: CreditCard, exact: false },
-    { href: "/locataire/signaler", label: "Signaler un problème", icon: Wrench, exact: false },
-    { href: "/locataire/profil", label: "Mon profil", icon: UserCircle, exact: false },
+    { href: "/locataire", label: "Accueil", icon: Home, exact: true, badge: 0 },
+    { href: "/locataire/paiements", label: "Mes paiements", icon: CreditCard, exact: false, badge: notifs.latePayments },
+    { href: "/locataire/signaler", label: "Signaler un problème", icon: Wrench, exact: false, badge: notifs.issueUpdates },
+    { href: "/locataire/profil", label: "Mon profil", icon: UserCircle, exact: false, badge: 0 },
   ];
 
   function isActive(href: string, exact: boolean): boolean {
@@ -143,7 +153,12 @@ export default function LocataireLayout({ children }: { children: React.ReactNod
                   )}
                 >
                   <item.icon className="h-5 w-5" />
-                  {item.label}
+                  <span className="flex-1">{item.label}</span>
+                  {item.badge > 0 && (
+                    <span className="ml-auto h-5 min-w-5 px-1 rounded-full bg-destructive text-destructive-foreground text-xs font-bold flex items-center justify-center">
+                      {item.badge > 9 ? "9+" : item.badge}
+                    </span>
+                  )}
                 </Link>
               );
             })}
@@ -179,7 +194,14 @@ export default function LocataireLayout({ children }: { children: React.ReactNod
                 active ? "text-primary" : "text-muted-foreground"
               )}
             >
-              <item.icon className={cn("h-5 w-5", active && "stroke-[2.5]")} />
+              <div className="relative">
+                <item.icon className={cn("h-5 w-5", active && "stroke-[2.5]")} />
+                {item.badge > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-0.5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">
+                    {item.badge > 9 ? "9+" : item.badge}
+                  </span>
+                )}
+              </div>
               <span className="text-[10px] text-center leading-tight">{item.label}</span>
             </Link>
           );

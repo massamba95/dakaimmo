@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Home, MapPin, CalendarDays, CreditCard, MessageCircle } from "lucide-react";
+import { Home, MapPin, CalendarDays, CreditCard, MessageCircle, TrendingDown, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 
 interface Tenant {
   id: string;
@@ -62,6 +62,8 @@ export default function LocataireHomePage() {
   const [lease, setLease] = useState<Lease | null>(null);
   const [nextDue, setNextDue] = useState<Payment | null>(null);
   const [lastPaid, setLastPaid] = useState<Payment | null>(null);
+  const [totalDue, setTotalDue] = useState(0);
+  const [recentPayments, setRecentPayments] = useState<Payment[]>([]);
   const [agency, setAgency] = useState<AgencyInfo | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -120,14 +122,20 @@ export default function LocataireHomePage() {
           .eq("lease_id", activeLease.id)
           .order("due_date", { ascending: true });
 
-        const due =
-          (payments ?? []).find((p) => p.status === "PENDING" || p.status === "LATE") ?? null;
-        setNextDue(due as Payment | null);
+        const allPayments = (payments ?? []) as Payment[];
+        const due = allPayments.find((p) => p.status === "PENDING" || p.status === "LATE") ?? null;
+        setNextDue(due);
 
-        const paid = (payments ?? [])
+        const total = allPayments
+          .filter((p) => p.status === "PENDING" || p.status === "LATE")
+          .reduce((sum, p) => sum + p.amount, 0);
+        setTotalDue(total);
+
+        const paid = allPayments
           .filter((p) => p.status === "PAID")
-          .sort((a, b) => (b.paid_date ?? "").localeCompare(a.paid_date ?? ""))[0];
-        setLastPaid((paid as Payment) ?? null);
+          .sort((a, b) => (b.paid_date ?? "").localeCompare(a.paid_date ?? ""));
+        setLastPaid(paid[0] ?? null);
+        setRecentPayments(allPayments.slice(-5).reverse());
       }
 
       const { data: org } = await supabase
@@ -299,6 +307,14 @@ export default function LocataireHomePage() {
                   )}
                 </>
               )}
+              {totalDue > 0 && (
+                <div className="mt-3 pt-3 border-t flex items-center gap-2 text-destructive">
+                  <TrendingDown className="h-4 w-4 shrink-0" />
+                  <span className="text-sm font-semibold">
+                    Solde dû : {totalDue.toLocaleString("fr-FR")} FCFA
+                  </span>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -345,6 +361,61 @@ export default function LocataireHomePage() {
               </div>
             </CardContent>
           </Card>
+          {recentPayments.length > 0 && (
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <CreditCard className="h-5 w-5 text-primary" />
+                  Historique récent
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {recentPayments.map((p) => {
+                    const isLate = p.status === "LATE";
+                    const isPending = p.status === "PENDING";
+                    const isPaid = p.status === "PAID";
+                    return (
+                      <div key={p.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                        <div className="flex items-center gap-3">
+                          {isPaid ? (
+                            <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                          ) : isLate ? (
+                            <AlertCircle className="h-4 w-4 text-destructive shrink-0" />
+                          ) : (
+                            <Clock className="h-4 w-4 text-yellow-500 shrink-0" />
+                          )}
+                          <div>
+                            <p className="text-sm font-medium">
+                              {new Date(p.due_date).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
+                            </p>
+                            {isPaid && p.paid_date && (
+                              <p className="text-xs text-muted-foreground">
+                                Payé le {new Date(p.paid_date).toLocaleDateString("fr-FR")}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold">{p.amount.toLocaleString("fr-FR")} FCFA</p>
+                          <p className={`text-xs font-medium ${isPaid ? "text-green-600" : isLate ? "text-destructive" : "text-yellow-600"}`}>
+                            {isPaid ? "Payé" : isLate ? "En retard" : "En attente"}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-3">
+                  <Link href="/locataire/paiements">
+                    <Button variant="ghost" size="sm" className="w-full text-primary">
+                      Voir tous mes paiements →
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 

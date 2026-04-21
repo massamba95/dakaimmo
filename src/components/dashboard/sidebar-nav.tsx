@@ -24,6 +24,7 @@ import {
   CalendarCheck,
   Wrench,
 } from "lucide-react";
+import { useState, useEffect } from "react";
 import type { Permission } from "@/lib/permissions";
 
 const roleLabels: Record<string, string> = {
@@ -34,21 +35,31 @@ const roleLabels: Record<string, string> = {
   SECRETARY: "Secretaire",
 };
 
+interface Notifs { openIssues: number; latePayments: number }
+
 export function SidebarNav() {
   const pathname = usePathname();
   const router = useRouter();
   const { orgName, role, loading } = useOrg();
+  const [notifs, setNotifs] = useState<Notifs>({ openIssues: 0, latePayments: 0 });
 
-  const navItems: { href: string; label: string; icon: typeof LayoutDashboard; permission: Permission | null }[] = [
+  useEffect(() => {
+    fetch("/api/dashboard/notifications")
+      .then((r) => r.json())
+      .then((d) => { if (d.openIssues !== undefined) setNotifs(d); })
+      .catch(() => {});
+  }, []);
+
+  const navItems: { href: string; label: string; icon: typeof LayoutDashboard; permission: Permission | null; badge?: number }[] = [
     { href: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard, permission: null },
     { href: "/dashboard/properties", label: "Mes biens", icon: Home, permission: "properties:view" },
     { href: "/dashboard/owners", label: "Propriétaires", icon: UserSquare2, permission: "owners:view" },
     { href: "/dashboard/tenants", label: "Locataires", icon: Users, permission: "tenants:view" },
     { href: "/dashboard/leases", label: "Baux", icon: FileText, permission: "leases:view" },
-    { href: "/dashboard/payments", label: "Paiements", icon: CreditCard, permission: "payments:view" },
+    { href: "/dashboard/payments", label: "Paiements", icon: CreditCard, permission: "payments:view", badge: notifs.latePayments },
     { href: "/dashboard/suivi", label: "Suivi mensuel", icon: CalendarDays, permission: "payments:view" },
     { href: "/dashboard/visits", label: "Visites", icon: CalendarCheck, permission: "properties:view" },
-    { href: "/dashboard/signalements", label: "Signalements", icon: Wrench, permission: "properties:view" },
+    { href: "/dashboard/signalements", label: "Signalements", icon: Wrench, permission: "properties:view", badge: notifs.openIssues },
     { href: "/dashboard/activity", label: "Historique", icon: History, permission: "team:manage" },
     { href: "/dashboard/team", label: "Equipe", icon: UsersRound, permission: "team:manage" },
     { href: "/dashboard/upgrade",  label: "Mon abonnement", icon: CreditCardIcon, permission: null },
@@ -98,7 +109,12 @@ export function SidebarNav() {
               )}
             >
               <item.icon className="h-5 w-5" />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {(item.badge ?? 0) > 0 && (
+                <span className="ml-auto h-5 min-w-5 px-1 rounded-full bg-destructive text-destructive-foreground text-xs font-bold flex items-center justify-center">
+                  {(item.badge ?? 0) > 9 ? "9+" : item.badge}
+                </span>
+              )}
             </Link>
           );
         })}
