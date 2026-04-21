@@ -29,6 +29,10 @@ export interface PublicProperty {
   charges: number;
   sale_price: number | null;
   photos: string[];
+  parent_id: string | null;
+  unit_label: string | null;
+  floor: number | null;
+  parent?: { title: string } | null;
 }
 
 type FilterTab = "all" | "RENT" | "SALE";
@@ -36,11 +40,14 @@ type FilterTab = "all" | "RENT" | "SALE";
 export function BiensGrid({ biens, orgName, orgId }: { biens: PublicProperty[]; orgName: string; orgId: string }) {
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
 
-  const rentCount = biens.filter((b) => b.listing_type === "RENT" || b.listing_type === "BOTH").length;
-  const saleCount = biens.filter((b) => b.listing_type === "SALE" || b.listing_type === "BOTH").length;
+  // Exclure les immeubles (conteneurs) de la vitrine
+  const displayBiens = biens.filter((b) => b.type !== "BUILDING");
+
+  const rentCount = displayBiens.filter((b) => b.listing_type === "RENT" || b.listing_type === "BOTH").length;
+  const saleCount = displayBiens.filter((b) => b.listing_type === "SALE" || b.listing_type === "BOTH").length;
   const showTabs = rentCount > 0 && saleCount > 0;
 
-  const filtered = biens.filter((b) => {
+  const filtered = displayBiens.filter((b) => {
     if (activeTab === "RENT") return b.listing_type === "RENT" || b.listing_type === "BOTH";
     if (activeTab === "SALE") return b.listing_type === "SALE" || b.listing_type === "BOTH";
     return true;
@@ -121,7 +128,12 @@ function BienCard({ bien, orgName, orgId }: { bien: PublicProperty; orgName: str
             {listingLabels[lt] ?? lt}
           </span>
 
-          <h2 className="font-semibold text-base leading-tight">{bien.title}</h2>
+          <div>
+            {bien.parent && (
+              <p className="text-xs text-muted-foreground mb-0.5">{bien.parent.title}{bien.unit_label ? ` · ${bien.unit_label}` : ""}</p>
+            )}
+            <h2 className="font-semibold text-base leading-tight">{bien.title}</h2>
+          </div>
 
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <MapPin className="h-4 w-4 shrink-0" />

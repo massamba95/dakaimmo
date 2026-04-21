@@ -50,12 +50,12 @@ export default async function AgencePublicPage({ params }: Props) {
 
   const { data: properties } = await supabase
     .from("properties")
-    .select("id, title, type, listing_type, address, city, rooms, area, rent_amount, charges, sale_price, photos")
+    .select("id, title, type, listing_type, address, city, rooms, area, rent_amount, charges, sale_price, photos, parent_id, unit_label, floor, parent:parent_id(title)")
     .eq("org_id", typedOrg.id)
     .eq("status", "AVAILABLE")
     .order("created_at", { ascending: false });
 
-  const biens = (properties ?? []) as PublicProperty[];
+  const biens = (properties ?? []) as unknown as PublicProperty[];
 
   return (
     <div className="min-h-screen bg-muted/30">

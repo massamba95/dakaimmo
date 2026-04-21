@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useOrg } from "@/lib/hooks/use-org";
 import { getPlanLimits } from "@/lib/plans";
@@ -20,12 +20,21 @@ interface Owner {
   last_name: string;
 }
 
+interface Building {
+  id: string;
+  title: string;
+  address: string;
+  city: string;
+}
+
 export default function NewPropertyPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { orgId, orgPlan, userId, userName } = useOrg();
   const [loading, setLoading] = useState(false);
   const [limitReached, setLimitReached] = useState(false);
   const [owners, setOwners] = useState<Owner[]>([]);
+  const [buildings, setBuildings] = useState<Building[]>([]);
   const [formData, setFormData] = useState({
     title: "",
     type: "APARTMENT",
@@ -38,19 +47,26 @@ export default function NewPropertyPage() {
     charges: "0",
     sale_price: "",
     owner_id: "",
+    parent_id: searchParams.get("parent") ?? "",
+    unit_label: "",
+    floor: "",
   });
 
   useEffect(() => {
     if (!orgId) return;
     async function init() {
       const supabase = createClient();
-      const [{ count }, { data: ownersData }] = await Promise.all([
-        supabase.from("properties").select("*", { count: "exact", head: true }).eq("org_id", orgId!),
+      const [{ count }, { data: ownersData }, { data: buildingsData }] = await Promise.all([
+        supabase.from("properties").select("*", { count: "exact", head: true })
+          .eq("org_id", orgId!).neq("type", "BUILDING"),
         supabase.from("owners").select("id, first_name, last_name").eq("org_id", orgId!).order("first_name"),
+        supabase.from("properties").select("id, title, address, city")
+          .eq("org_id", orgId!).eq("type", "BUILDING").order("title"),
       ]);
       const limits = getPlanLimits(orgPlan ?? "FREE");
       setLimitReached((count ?? 0) >= limits.maxProperties);
       setOwners(ownersData ?? []);
+      setBuildings(buildingsData ?? []);
     }
     init();
   }, [orgId, orgPlan]);
@@ -59,18 +75,22 @@ export default function NewPropertyPage() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   }
 
+  const isBuilding = formData.type === "BUILDING";
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!orgId || limitReached) return;
 
-    const lt = formData.listing_type;
-    if ((lt === "RENT" || lt === "BOTH") && !formData.rent_amount) {
-      toast.error("Le loyer mensuel est requis pour une location.");
-      return;
-    }
-    if ((lt === "SALE" || lt === "BOTH") && !formData.sale_price) {
-      toast.error("Le prix de vente est requis pour une vente.");
-      return;
+    if (!isBuilding) {
+      const lt = formData.listing_type;
+      if ((lt === "RENT" || lt === "BOTH") && !formData.rent_amount) {
+        toast.error("Le loyer mensuel est requis pour une location.");
+        return;
+      }
+      if ((lt === "SALE" || lt === "BOTH") && !formData.sale_price) {
+        toast.error("Le prix de vente est requis pour une vente.");
+        return;
+      }
     }
 
     setLoading(true);
@@ -82,15 +102,18 @@ export default function NewPropertyPage() {
       org_id: orgId,
       title: formData.title,
       type: formData.type,
-      listing_type: formData.listing_type,
+      listing_type: isBuilding ? "RENT" : formData.listing_type,
       address: formData.address,
       city: formData.city,
       rooms: formData.rooms ? parseInt(formData.rooms) : null,
       area: formData.area ? parseFloat(formData.area) : null,
-      rent_amount: formData.rent_amount ? parseInt(formData.rent_amount) : 0,
-      charges: parseInt(formData.charges) || 0,
-      sale_price: formData.sale_price ? parseInt(formData.sale_price) : null,
+      rent_amount: isBuilding ? 0 : (formData.rent_amount ? parseInt(formData.rent_amount) : 0),
+      charges: isBuilding ? 0 : (parseInt(formData.charges) || 0),
+      sale_price: isBuilding ? null : (formData.sale_price ? parseInt(formData.sale_price) : null),
       owner_id: formData.owner_id || null,
+      parent_id: formData.parent_id || null,
+      unit_label: formData.unit_label || null,
+      floor: formData.floor ? parseInt(formData.floor) : null,
       status: "AVAILABLE",
       photos: [],
     });
@@ -122,7 +145,7 @@ export default function NewPropertyPage() {
 
   const limits = getPlanLimits(orgPlan ?? "FREE");
 
-  if (limitReached) {
+  if (limitReached && !isBuilding) {
     return (
       <div>
         <Link href="/dashboard/properties" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
@@ -157,71 +180,129 @@ export default function NewPropertyPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
 
-            {/* Nom */}
+            {/* Type de bien */}
             <div className="space-y-2">
-              <Label htmlFor="title">Nom du bien</Label>
-              <Input id="title" placeholder="Ex: Appartement F3 Almadies" value={formData.title} onChange={(e) => updateField("title", e.target.value)} required />
-            </div>
-
-            {/* Type annonce */}
-            <div className="space-y-2">
-              <Label>Type d&apos;annonce</Label>
+              <Label>Type de bien</Label>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { value: "RENT", label: "Location", sub: "Loyer mensuel" },
-                  { value: "SALE", label: "Vente", sub: "Prix de vente" },
-                  { value: "BOTH", label: "Les deux", sub: "Location + Vente" },
+                  { value: "APARTMENT", label: "Appartement" },
+                  { value: "HOUSE", label: "Maison" },
+                  { value: "BUILDING", label: "Immeuble / Résidence" },
+                  { value: "COMMERCIAL", label: "Local commercial" },
+                  { value: "LAND", label: "Terrain" },
                 ].map((opt) => (
                   <button
                     key={opt.value}
                     type="button"
-                    className={`p-3 rounded-lg border text-sm font-medium text-center transition-colors ${formData.listing_type === opt.value ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"}`}
-                    onClick={() => updateField("listing_type", opt.value)}
+                    className={`p-3 rounded-lg border text-sm font-medium text-center transition-colors ${formData.type === opt.value ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"}`}
+                    onClick={() => updateField("type", opt.value)}
                   >
                     {opt.label}
-                    <p className="text-xs mt-1 opacity-75">{opt.sub}</p>
                   </button>
                 ))}
               </div>
+              {isBuilding && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  L&apos;immeuble est un conteneur. Les appartements seront ajoutés à l&apos;intérieur et comptent chacun comme 1 bien.
+                </p>
+              )}
             </div>
 
-            {/* Type bien + ville */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Rattacher à un immeuble (seulement pour les unités) */}
+            {!isBuilding && buildings.length > 0 && (
               <div className="space-y-2">
-                <Label>Type de bien</Label>
-                <select className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" value={formData.type} onChange={(e) => updateField("type", e.target.value)}>
-                  <option value="APARTMENT">Appartement</option>
-                  <option value="HOUSE">Maison</option>
-                  <option value="COMMERCIAL">Local commercial</option>
-                  <option value="LAND">Terrain</option>
+                <Label>Rattacher à un immeuble (optionnel)</Label>
+                <select
+                  className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                  value={formData.parent_id}
+                  onChange={(e) => updateField("parent_id", e.target.value)}
+                >
+                  <option value="">— Bien indépendant</option>
+                  {buildings.map((b) => (
+                    <option key={b.id} value={b.id}>{b.title} — {b.city}</option>
+                  ))}
                 </select>
               </div>
+            )}
+
+            {/* Label unité + étage si rattaché */}
+            {!isBuilding && formData.parent_id && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="unit_label">Libellé de l&apos;unité</Label>
+                  <Input id="unit_label" placeholder="Ex: Appt 3B, F3 Étage 2" value={formData.unit_label} onChange={(e) => updateField("unit_label", e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="floor">Étage</Label>
+                  <Input id="floor" type="number" placeholder="1" value={formData.floor} onChange={(e) => updateField("floor", e.target.value)} />
+                </div>
+              </div>
+            )}
+
+            {/* Nom */}
+            <div className="space-y-2">
+              <Label htmlFor="title">{isBuilding ? "Nom de l'immeuble" : "Nom du bien"}</Label>
+              <Input
+                id="title"
+                placeholder={isBuilding ? "Ex: Résidence Les Almadies" : "Ex: Appartement F3 Almadies"}
+                value={formData.title}
+                onChange={(e) => updateField("title", e.target.value)}
+                required
+              />
+            </div>
+
+            {/* Type annonce — masqué pour BUILDING */}
+            {!isBuilding && (
+              <div className="space-y-2">
+                <Label>Type d&apos;annonce</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: "RENT", label: "Location", sub: "Loyer mensuel" },
+                    { value: "SALE", label: "Vente", sub: "Prix de vente" },
+                    { value: "BOTH", label: "Les deux", sub: "Location + Vente" },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      className={`p-3 rounded-lg border text-sm font-medium text-center transition-colors ${formData.listing_type === opt.value ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"}`}
+                      onClick={() => updateField("listing_type", opt.value)}
+                    >
+                      {opt.label}
+                      <p className="text-xs mt-1 opacity-75">{opt.sub}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Ville + adresse */}
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="city">Ville</Label>
                 <Input id="city" placeholder="Dakar" value={formData.city} onChange={(e) => updateField("city", e.target.value)} required />
               </div>
-            </div>
-
-            {/* Adresse */}
-            <div className="space-y-2">
-              <Label htmlFor="address">Adresse</Label>
-              <Input id="address" placeholder="Adresse complète" value={formData.address} onChange={(e) => updateField("address", e.target.value)} required />
-            </div>
-
-            {/* Pièces + superficie */}
-            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="rooms">Nombre de pièces</Label>
-                <Input id="rooms" type="number" placeholder="3" value={formData.rooms} onChange={(e) => updateField("rooms", e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="area">Superficie (m²)</Label>
-                <Input id="area" type="number" placeholder="75" value={formData.area} onChange={(e) => updateField("area", e.target.value)} />
+                <Label htmlFor="address">Adresse</Label>
+                <Input id="address" placeholder="Adresse complète" value={formData.address} onChange={(e) => updateField("address", e.target.value)} required />
               </div>
             </div>
 
-            {/* Prix selon listing_type */}
-            {(lt === "RENT" || lt === "BOTH") && (
+            {/* Pièces + superficie — masqué pour BUILDING */}
+            {!isBuilding && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="rooms">Nombre de pièces</Label>
+                  <Input id="rooms" type="number" placeholder="3" value={formData.rooms} onChange={(e) => updateField("rooms", e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="area">Superficie (m²)</Label>
+                  <Input id="area" type="number" placeholder="75" value={formData.area} onChange={(e) => updateField("area", e.target.value)} />
+                </div>
+              </div>
+            )}
+
+            {/* Prix — masqué pour BUILDING */}
+            {!isBuilding && (lt === "RENT" || lt === "BOTH") && (
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="rent_amount">Loyer mensuel (FCFA)</Label>
@@ -234,7 +315,7 @@ export default function NewPropertyPage() {
               </div>
             )}
 
-            {(lt === "SALE" || lt === "BOTH") && (
+            {!isBuilding && (lt === "SALE" || lt === "BOTH") && (
               <div className="space-y-2">
                 <Label htmlFor="sale_price">Prix de vente (FCFA)</Label>
                 <Input id="sale_price" type="number" placeholder="25000000" value={formData.sale_price} onChange={(e) => updateField("sale_price", e.target.value)} />
@@ -262,7 +343,7 @@ export default function NewPropertyPage() {
             </div>
 
             <div className="flex gap-4">
-              <Button type="submit" disabled={loading}>{loading ? "Ajout en cours..." : "Ajouter le bien"}</Button>
+              <Button type="submit" disabled={loading}>{loading ? "Ajout en cours..." : isBuilding ? "Créer l'immeuble" : "Ajouter le bien"}</Button>
               <Link href="/dashboard/properties"><Button type="button" variant="outline">Annuler</Button></Link>
             </div>
           </form>
