@@ -11,6 +11,7 @@ interface IssueRow {
   status: "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
   created_at: string;
   resolved_at: string | null;
+  photos: string[] | null;
   tenants: { first_name: string; last_name: string; phone: string } | null;
   properties: { title: string; address: string; city: string } | null;
 }
@@ -261,6 +262,16 @@ export default function SignalementsPage() {
                 <p className="text-sm whitespace-pre-wrap border-t pt-3">
                   {issue.description}
                 </p>
+                {issue.photos && issue.photos.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {issue.photos.map((url, i) => (
+                      <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt="" className="h-20 w-20 object-cover rounded-lg border hover:opacity-80 transition-opacity" />
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}

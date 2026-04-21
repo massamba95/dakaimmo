@@ -33,7 +33,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("issues")
-    .select("id, title, description, category, status, created_at, resolved_at")
+    .select("id, title, description, category, status, created_at, resolved_at, photos")
     .eq("tenant_id", tenant.id)
     .order("created_at", { ascending: false });
 
@@ -48,6 +48,9 @@ export async function POST(req: Request) {
   const title = typeof body.title === "string" ? body.title.trim().slice(0, 100) : "";
   const description = typeof body.description === "string" ? body.description.trim() : "";
   const category = typeof body.category === "string" ? body.category : "OTHER";
+  const photos = Array.isArray(body.photos)
+    ? (body.photos as unknown[]).filter((u) => typeof u === "string").slice(0, 3)
+    : [];
 
   if (!title) {
     return NextResponse.json({ error: "Le titre est requis." }, { status: 400 });
@@ -99,6 +102,7 @@ export async function POST(req: Request) {
       description,
       category: finalCategory,
       status: "OPEN",
+      photos,
     })
     .select("id")
     .single();

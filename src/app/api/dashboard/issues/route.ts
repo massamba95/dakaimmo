@@ -24,7 +24,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("issues")
     .select(
-      "id, title, description, category, status, created_at, resolved_at, tenant_id, property_id, lease_id, tenants(first_name, last_name, phone), properties(title, address, city)"
+      "id, title, description, category, status, created_at, resolved_at, photos, tenant_id, property_id, lease_id, tenants(first_name, last_name, phone), properties(title, address, city)"
     )
     .eq("org_id", membership.org_id)
     .order("created_at", { ascending: false });

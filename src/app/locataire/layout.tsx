@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Building2, Home, CreditCard, Wrench, LogOut } from "lucide-react";
+import { Building2, Home, CreditCard, Wrench, LogOut, UserCircle } from "lucide-react";
 
 type State = "loading" | "no-tenant" | "ready";
 
@@ -91,6 +91,7 @@ export default function LocataireLayout({ children }: { children: React.ReactNod
     { href: "/locataire", label: "Accueil", icon: Home, exact: true },
     { href: "/locataire/paiements", label: "Mes paiements", icon: CreditCard, exact: false },
     { href: "/locataire/signaler", label: "Signaler un problème", icon: Wrench, exact: false },
+    { href: "/locataire/profil", label: "Mon profil", icon: UserCircle, exact: false },
   ];
 
   function isActive(href: string, exact: boolean): boolean {
