@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Home, MapPin, DoorOpen, Ruler, MessageCircle, Calendar, Loader2, CheckCircle2 } from "lucide-react";
+import { useState, useCallback } from "react";
+import { Home, MapPin, DoorOpen, Ruler, MessageCircle, Calendar, Loader2, CheckCircle2, ChevronLeft, ChevronRight, X, ZoomIn } from "lucide-react";
 
 const typeLabels: Record<string, string> = {
   APARTMENT: "Appartement",
@@ -40,7 +40,6 @@ type FilterTab = "all" | "RENT" | "SALE";
 export function BiensGrid({ biens, orgName, orgId }: { biens: PublicProperty[]; orgName: string; orgId: string }) {
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
 
-  // Exclure les immeubles (conteneurs) de la vitrine
   const displayBiens = biens.filter((b) => b.type !== "BUILDING");
 
   const rentCount = displayBiens.filter((b) => b.listing_type === "RENT" || b.listing_type === "BOTH").length;
@@ -58,7 +57,7 @@ export function BiensGrid({ biens, orgName, orgId }: { biens: PublicProperty[]; 
       {showTabs && (
         <div className="flex gap-1 border-b mb-6">
           {([
-            { key: "all",  label: `Tous (${biens.length})` },
+            { key: "all",  label: `Tous (${displayBiens.length})` },
             { key: "RENT", label: `Location (${rentCount})` },
             { key: "SALE", label: `Vente (${saleCount})` },
           ] as const).map((tab) => (
@@ -93,8 +92,141 @@ export function BiensGrid({ biens, orgName, orgId }: { biens: PublicProperty[]; 
   );
 }
 
+function PhotoCarousel({ photos, title }: { photos: string[]; title: string }) {
+  const [index, setIndex] = useState(0);
+  const [lightbox, setLightbox] = useState(false);
+
+  const prev = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIndex((i) => (i - 1 + photos.length) % photos.length);
+  }, [photos.length]);
+
+  const next = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIndex((i) => (i + 1) % photos.length);
+  }, [photos.length]);
+
+  if (photos.length === 0) {
+    return (
+      <div className="w-full h-48 bg-muted flex items-center justify-center">
+        <Home className="h-10 w-10 text-muted-foreground/40" />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="relative w-full h-48 group overflow-hidden">
+        <img
+          src={photos[index]}
+          alt={`${title} — photo ${index + 1}`}
+          className="w-full h-full object-cover"
+        />
+
+        {/* Bouton zoom */}
+        <button
+          onClick={() => setLightbox(true)}
+          className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-colors"
+        >
+          <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow" />
+        </button>
+
+        {/* Navigation — seulement si plusieurs photos */}
+        {photos.length > 1 && (
+          <>
+            <button
+              onClick={prev}
+              className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              onClick={next}
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 transition-colors"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+
+            {/* Compteur */}
+            <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full">
+              {index + 1}/{photos.length}
+            </div>
+
+            {/* Dots */}
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+              {photos.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={(e) => { e.stopPropagation(); setIndex(i); }}
+                  className={`w-1.5 h-1.5 rounded-full transition-colors ${i === index ? "bg-white" : "bg-white/50"}`}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4"
+          onClick={() => setLightbox(false)}
+        >
+          <button
+            onClick={() => setLightbox(false)}
+            className="absolute top-4 right-4 text-white/80 hover:text-white"
+          >
+            <X className="h-7 w-7" />
+          </button>
+
+          <div className="relative max-w-4xl w-full" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={photos[index]}
+              alt={`${title} — photo ${index + 1}`}
+              className="w-full max-h-[80vh] object-contain rounded-lg"
+            />
+
+            {photos.length > 1 && (
+              <>
+                <button
+                  onClick={prev}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white rounded-full p-2"
+                >
+                  <ChevronLeft className="h-6 w-6" />
+                </button>
+                <button
+                  onClick={next}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white rounded-full p-2"
+                >
+                  <ChevronRight className="h-6 w-6" />
+                </button>
+              </>
+            )}
+
+            {/* Miniatures */}
+            {photos.length > 1 && (
+              <div className="flex gap-2 mt-3 overflow-x-auto pb-1 justify-center">
+                {photos.map((p, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setIndex(i)}
+                    className={`shrink-0 w-16 h-12 rounded overflow-hidden border-2 transition-colors ${i === index ? "border-white" : "border-transparent opacity-60 hover:opacity-100"}`}
+                  >
+                    <img src={p} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <p className="text-center text-white/60 text-sm mt-2">{index + 1} / {photos.length}</p>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function BienCard({ bien, orgName, orgId }: { bien: PublicProperty; orgName: string; orgId: string }) {
-  const photo = bien.photos?.[0];
   const lt = bien.listing_type;
   const [showVisit, setShowVisit] = useState(false);
 
@@ -115,13 +247,7 @@ function BienCard({ bien, orgName, orgId }: { bien: PublicProperty; orgName: str
   return (
     <>
       <div className="bg-card rounded-xl border overflow-hidden hover:shadow-md transition-shadow">
-        {photo ? (
-          <img src={photo} alt={bien.title} className="w-full h-44 object-cover" />
-        ) : (
-          <div className="w-full h-44 bg-muted flex items-center justify-center">
-            <Home className="h-10 w-10 text-muted-foreground/40" />
-          </div>
-        )}
+        <PhotoCarousel photos={bien.photos ?? []} title={bien.title} />
 
         <div className="p-4 space-y-3">
           <span className="inline-block text-xs font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded-full">
