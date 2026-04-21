@@ -76,8 +76,12 @@ export default function PropertiesPage() {
   async function fetchProperties() {
     if (!orgId) return;
     const supabase = createClient();
-    const { data } = await supabase.from("properties").select("*").eq("org_id", orgId).order("created_at", { ascending: false });
-    if (data) setProperties(data);
+    const { data, error } = await supabase.from("properties").select("*").eq("org_id", orgId).order("created_at", { ascending: false });
+    if (error) {
+      console.error("[properties] fetch error:", error);
+    }
+    console.log("[properties] loaded:", data?.length ?? 0, "for org", orgId);
+    setProperties(data ?? []);
   }
 
   useEffect(() => {
@@ -100,7 +104,9 @@ export default function PropertiesPage() {
   // Séparer bâtiments, unités enfants et biens autonomes
   const buildings = properties.filter((p) => p.type === "BUILDING");
   const unitsByBuilding = (buildingId: string) => properties.filter((p) => p.parent_id === buildingId);
-  const standalone = properties.filter((p) => p.type !== "BUILDING" && !p.parent_id);
+  // Les biens "autonomes" : tout ce qui n'est ni un immeuble, ni une unité rattachée à un immeuble existant
+  const buildingIds = new Set(buildings.map((b) => b.id));
+  const standalone = properties.filter((p) => p.type !== "BUILDING" && !(p.parent_id && buildingIds.has(p.parent_id)));
 
   const applyTabFilter = (list: Property[]) => list.filter((p) => {
     if (activeTab === "SOLD") return p.status === "SOLD";
@@ -327,6 +333,12 @@ export default function PropertiesPage() {
 
           {visibleBuildings.length === 0 && visibleStandalone.length === 0 && search && (
             <p className="text-muted-foreground text-center py-12">Aucun résultat pour &quot;{search}&quot;</p>
+          )}
+
+          {visibleBuildings.length === 0 && visibleStandalone.length === 0 && !search && properties.length > 0 && (
+            <p className="text-muted-foreground text-center py-12">
+              {properties.length} bien(s) en base mais aucun à afficher avec le filtre actuel. Vérifiez l&apos;onglet sélectionné.
+            </p>
           )}
         </div>
       )}
