@@ -2,16 +2,20 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2 } from "lucide-react";
+import { Building2, Home } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get("redirect");
+  const isLocataire = redirect === "/locataire";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -34,7 +38,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/dashboard");
+    router.push(redirect ?? "/dashboard");
     router.refresh();
   }
 
@@ -46,10 +50,24 @@ export default function LoginPage() {
             <Building2 className="h-8 w-8 text-primary" />
             <span className="text-xl font-bold">Jappalé Immo</span>
           </Link>
-          <CardTitle className="text-2xl">Connexion</CardTitle>
-          <CardDescription>
-            Connectez-vous a votre compte pour acceder a votre tableau de bord.
-          </CardDescription>
+          {isLocataire ? (
+            <>
+              <div className="mx-auto mb-2 h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <Home className="h-6 w-6 text-primary" />
+              </div>
+              <CardTitle className="text-2xl">Espace locataire</CardTitle>
+              <CardDescription>
+                Connectez-vous pour accéder à votre espace locataire.
+              </CardDescription>
+            </>
+          ) : (
+            <>
+              <CardTitle className="text-2xl">Connexion</CardTitle>
+              <CardDescription>
+                Connectez-vous a votre compte pour acceder a votre tableau de bord.
+              </CardDescription>
+            </>
+          )}
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

@@ -286,6 +286,9 @@ export default function HomePage() {
             </a>
           </nav>
           <div className="flex items-center gap-3">
+            <Link href="/login?redirect=/locataire" className="hidden sm:block">
+              <Button variant="ghost" size="sm">Espace locataire</Button>
+            </Link>
             <Link href="/login">
               <Button variant="ghost" size="sm">Connexion</Button>
             </Link>
@@ -656,6 +659,7 @@ export default function HomePage() {
                 <ul className="space-y-2">
                   <li><Link href="/login" className="text-sm text-muted-foreground hover:text-foreground">Connexion</Link></li>
                   <li><Link href="/register" className="text-sm text-muted-foreground hover:text-foreground">Inscription</Link></li>
+                  <li><Link href="/login?redirect=/locataire" className="text-sm text-muted-foreground hover:text-foreground">Espace locataire</Link></li>
                 </ul>
               </div>
               <div>
