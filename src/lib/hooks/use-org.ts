@@ -51,10 +51,10 @@ export function useOrg(): OrgData {
         return;
       }
 
-      // D'abord chercher un membership ACTIVE
+      // Requête memberships SANS join organizations (évite la récursion RLS)
       const { data: memberships } = await supabase
         .from("memberships")
-        .select("org_id, role, status, organizations(name, slug, plan, status, trial_ends_at, owner_id)")
+        .select("org_id, role, status")
         .eq("user_id", user.id)
         .eq("status", "ACTIVE")
         .order("created_at", { ascending: false })
@@ -66,7 +66,7 @@ export function useOrg(): OrgData {
       if (!membership) {
         const { data: pendingMemberships } = await supabase
           .from("memberships")
-          .select("org_id, role, status, organizations(name, slug, plan, status, trial_ends_at, owner_id)")
+          .select("org_id, role, status")
           .eq("user_id", user.id)
           .eq("status", "PENDING")
           .order("created_at", { ascending: false })
@@ -76,7 +76,14 @@ export function useOrg(): OrgData {
       }
 
       if (membership) {
-        const org = membership.organizations as unknown as Record<string, string> | null;
+        // Requête org séparée pour éviter le chain RLS memberships → organizations → memberships
+        const { data: orgData } = await supabase
+          .from("organizations")
+          .select("name, slug, plan, status, trial_ends_at, owner_id")
+          .eq("id", membership.org_id)
+          .single();
+
+        const org = orgData as Record<string, string> | null;
         const plan = org?.plan ?? "FREE";
         const limits = getPlanLimits(plan);
         setData({
