@@ -32,15 +32,19 @@ export default function LocataireProfilPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data } = await supabase
-        .from("profiles")
-        .select("first_name, last_name, email, phone")
-        .eq("id", user.id)
-        .single();
+      const [{ data: profileData }, { data: tenantData }] = await Promise.all([
+        supabase.from("profiles").select("email, phone").eq("id", user.id).single(),
+        supabase.from("tenants").select("first_name, last_name, phone").eq("user_id", user.id).limit(1).maybeSingle(),
+      ]);
 
-      if (data) {
-        setProfile(data as Profile);
-        setPhone(data.phone ?? "");
+      if (profileData) {
+        setProfile({
+          first_name: tenantData?.first_name ?? "",
+          last_name: tenantData?.last_name ?? "",
+          email: profileData.email ?? user.email ?? "",
+          phone: tenantData?.phone ?? profileData.phone ?? "",
+        });
+        setPhone(tenantData?.phone ?? profileData.phone ?? "");
       }
     }
     load();
@@ -53,16 +57,17 @@ export default function LocataireProfilPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { error } = await supabase
-      .from("profiles")
-      .update({ phone: phone.trim() })
-      .eq("id", user.id);
+    const trimmed = phone.trim();
+    const [{ error: e1 }, { error: e2 }] = await Promise.all([
+      supabase.from("profiles").update({ phone: trimmed }).eq("id", user.id),
+      supabase.from("tenants").update({ phone: trimmed }).eq("user_id", user.id),
+    ]);
 
-    if (error) {
+    if (e1 || e2) {
       toast.error("Erreur lors de la mise à jour.");
     } else {
       toast.success("Téléphone mis à jour.");
-      setProfile((prev) => prev ? { ...prev, phone: phone.trim() } : prev);
+      setProfile((prev) => prev ? { ...prev, phone: trimmed } : prev);
     }
     setSavingInfo(false);
   }
