@@ -50,28 +50,58 @@ export async function POST(
 
   const redirectTo = "https://jappaleimmo.com/locataire/bienvenue";
 
-  const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
-    type: "invite",
-    email: tenant.email,
-    options: { redirectTo },
-  });
+  // Vérifier si un compte auth existe déjà pour cet email
+  const { data: existingUsers } = await admin.auth.admin.listUsers();
+  const existingUser = existingUsers?.users?.find(
+    (u) => u.email?.toLowerCase() === tenant.email!.toLowerCase()
+  );
 
-  if (linkError || !linkData?.properties?.action_link) {
-    return NextResponse.json(
-      { error: linkError?.message ?? "Impossible de générer le lien d'invitation." },
-      { status: 500 }
-    );
+  let actionLink: string;
+  let resolvedUserId: string | undefined;
+
+  if (existingUser) {
+    // Utilisateur déjà enregistré → envoyer un magic link de connexion
+    const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
+      type: "magiclink",
+      email: tenant.email,
+      options: { redirectTo },
+    });
+
+    if (linkError || !linkData?.properties?.action_link) {
+      return NextResponse.json(
+        { error: linkError?.message ?? "Impossible de générer le lien de connexion." },
+        { status: 500 }
+      );
+    }
+
+    actionLink = linkData.properties.action_link;
+    resolvedUserId = existingUser.id;
+  } else {
+    // Nouvel utilisateur → invitation classique
+    const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
+      type: "invite",
+      email: tenant.email,
+      options: { redirectTo },
+    });
+
+    if (linkError || !linkData?.properties?.action_link) {
+      return NextResponse.json(
+        { error: linkError?.message ?? "Impossible de générer le lien d'invitation." },
+        { status: 500 }
+      );
+    }
+
+    actionLink = linkData.properties.action_link;
+    resolvedUserId = linkData.user?.id;
   }
 
-  const actionLink = linkData.properties.action_link;
-  const invitedUserId = linkData.user?.id;
-
-  if (!tenant.user_id && invitedUserId) {
+  // Lier le locataire au compte auth si pas encore fait
+  if (resolvedUserId && !tenant.user_id) {
     await admin
       .from("tenants")
-      .update({ user_id: invitedUserId, invited_at: new Date().toISOString() })
+      .update({ user_id: resolvedUserId, invited_at: new Date().toISOString() })
       .eq("id", tenant.id);
-  } else if (tenant.user_id) {
+  } else {
     await admin
       .from("tenants")
       .update({ invited_at: new Date().toISOString() })
@@ -85,6 +115,7 @@ export async function POST(
     .single();
 
   const orgName = org?.name ?? "votre agence";
+  const isExisting = !!existingUser;
 
   if (process.env.RESEND_API_KEY) {
     const html = `
@@ -105,7 +136,10 @@ export async function POST(
         Accéder à mon espace
       </a>
       <p style="margin:24px 0 0;color:#6b7280;font-size:13px;">
-        Ce lien vous permettra de définir votre mot de passe. Il est valable 24 heures.
+        ${isExisting
+          ? "Ce lien de connexion est valable 1 heure."
+          : "Ce lien vous permettra de définir votre mot de passe. Il est valable 24 heures."
+        }
       </p>
     </div>
     <div style="background:#f9fafb;padding:16px 32px;border-top:1px solid #e5e7eb;">
