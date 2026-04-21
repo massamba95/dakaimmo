@@ -35,12 +35,9 @@ export default function LocataireLayout({ children }: { children: React.ReactNod
         return;
       }
 
-      const { data: tenant } = await supabase
-        .from("tenants")
-        .select("id, first_name, last_name")
-        .eq("user_id", user.id)
-        .limit(1)
-        .maybeSingle();
+      // Utilise l'API qui gère aussi l'auto-lien par email si user_id pas encore défini
+      const res = await fetch("/api/locataire/init");
+      const tenant = res.ok ? await res.json() : null;
 
       if (!tenant) {
         setState("no-tenant");

@@ -121,7 +121,7 @@ export async function POST(
     .single();
 
   const orgName = org?.name ?? "votre agence";
-  const isExisting = !!existingUser;
+  const isExisting = !!existingUserId;
 
   if (process.env.RESEND_API_KEY) {
     const html = `
