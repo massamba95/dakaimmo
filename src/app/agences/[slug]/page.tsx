@@ -93,7 +93,7 @@ export default async function AgencePublicPage({ params }: Props) {
             </p>
           </div>
         ) : (
-          <BiensGrid biens={biens} orgName={typedOrg.name} />
+          <BiensGrid biens={biens} orgName={typedOrg.name} orgId={typedOrg.id} />
         )}
       </main>
 
