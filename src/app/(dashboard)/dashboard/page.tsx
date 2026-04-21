@@ -71,8 +71,8 @@ export default function DashboardPage() {
       const in30DaysStr = in30Days.toISOString().split("T")[0];
 
       const [propRes, occRes, tenRes, overdueRes, expiringRes] = await Promise.all([
-        supabase.from("properties").select("*", { count: "exact", head: true }).eq("org_id", orgId!),
-        supabase.from("properties").select("*", { count: "exact", head: true }).eq("org_id", orgId!).eq("status", "OCCUPIED"),
+        supabase.from("properties").select("*", { count: "exact", head: true }).eq("org_id", orgId!).neq("type", "BUILDING"),
+        supabase.from("properties").select("*", { count: "exact", head: true }).eq("org_id", orgId!).neq("type", "BUILDING").eq("status", "OCCUPIED"),
         supabase.from("tenants").select("*", { count: "exact", head: true }).eq("org_id", orgId!),
         supabase
           .from("payments")
