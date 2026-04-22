@@ -131,8 +131,8 @@ export default function NewLeasePage() {
       tenant_id: formData.tenant_id,
       start_date: formData.start_date,
       end_date: formData.end_date || null,
-      rent_amount: parseInt(formData.rent_amount),
-      deposit: parseInt(formData.deposit) || 0,
+      rent_amount: Math.round(Number(formData.rent_amount.replace(/\s/g, ""))),
+      deposit: Math.round(Number(formData.deposit.replace(/\s/g, ""))) || 0,
       status: "ACTIVE",
     });
 

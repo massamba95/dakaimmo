@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Home, MapPin, CalendarDays, CreditCard, MessageCircle,
-  TrendingDown, CheckCircle2, Clock, AlertCircle,
+  TrendingDown, CheckCircle2, Clock, AlertCircle, ChevronDown,
 } from "lucide-react";
 
 interface Tenant {
@@ -66,6 +66,7 @@ function buildWhatsAppUrl(phone: string, message: string): string {
 export default function LocataireHomePage() {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [leases, setLeases] = useState<LeaseBlock[]>([]);
+  const [selectedLeaseId, setSelectedLeaseId] = useState<string>("");
   const [agency, setAgency] = useState<AgencyInfo | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -123,11 +124,10 @@ export default function LocataireHomePage() {
         return { id: l.id, start_date: l.start_date, end_date: l.end_date, rent_amount: l.rent_amount, deposit: l.deposit, status: l.status, property, nextDue, totalDue, recentPayments };
       });
 
-      // Actifs d'abord
       blocks.sort((a, b) => (a.status === "ACTIVE" ? -1 : 1) - (b.status === "ACTIVE" ? -1 : 1));
       setLeases(blocks);
+      if (blocks.length > 0) setSelectedLeaseId(blocks[0].id);
 
-      // Agence
       const { data: org } = await supabase
         .from("organizations")
         .select("name, memberships(role, status, profiles(phone))")
@@ -152,6 +152,8 @@ export default function LocataireHomePage() {
   const contactMessage = `Bonjour ${agency?.name ?? ""},\n\nJe vous contacte via mon espace locataire.`;
   const whatsappUrl = agency?.phone ? buildWhatsAppUrl(agency.phone, contactMessage) : null;
 
+  const lease = leases.find((l) => l.id === selectedLeaseId) ?? leases[0] ?? null;
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div>
@@ -167,7 +169,32 @@ export default function LocataireHomePage() {
         </Card>
       ) : (
         <>
-          {leases.map((lease) => {
+          {/* Sélecteur de bail si plusieurs */}
+          {leases.length > 1 && (
+            <div className="flex items-center gap-3">
+              <label htmlFor="lease-select" className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+                Bail affiché :
+              </label>
+              <div className="relative flex-1 max-w-xs">
+                <select
+                  id="lease-select"
+                  value={selectedLeaseId}
+                  onChange={(e) => setSelectedLeaseId(e.target.value)}
+                  className="w-full appearance-none rounded-lg border border-input bg-card px-3 py-2 pr-8 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  {leases.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.property?.title ?? `Bail ${l.id.slice(0, 6).toUpperCase()}`}
+                      {l.status === "ACTIVE" ? " · Actif" : " · Terminé"}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              </div>
+            </div>
+          )}
+
+          {lease && (() => {
             const property = lease.property;
             const mainPhoto = property?.photos?.[0] ?? null;
             const isActive = lease.status === "ACTIVE";
@@ -178,10 +205,9 @@ export default function LocataireHomePage() {
               : { label: "En attente", tone: "bg-yellow-100 text-yellow-800" };
 
             return (
-              <div key={lease.id} className="space-y-4">
+              <div className="space-y-4">
                 {leases.length > 1 && (
                   <div className="flex items-center gap-3">
-                    <h2 className="font-semibold text-base">{property?.title ?? "Bail"}</h2>
                     <Badge variant={isActive ? "default" : "secondary"}>
                       {isActive ? "Actif" : "Terminé"}
                     </Badge>
@@ -336,11 +362,9 @@ export default function LocataireHomePage() {
                     </Card>
                   )}
                 </div>
-
-                {leases.length > 1 && <hr className="border-border" />}
               </div>
             );
-          })}
+          })()}
         </>
       )}
 
