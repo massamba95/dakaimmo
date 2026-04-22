@@ -7,55 +7,36 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Home, MapPin, CalendarDays, CreditCard, MessageCircle,
-  TrendingDown, CheckCircle2, Clock, AlertCircle, ChevronDown,
+  MessageCircle, Plus, FileText, ClipboardList,
+  CheckCircle2, AlertCircle, Clock, Wrench, TrendingDown,
 } from "lucide-react";
-
-interface Tenant {
-  id: string;
-  org_id: string;
-  first_name: string;
-  last_name: string;
-  phone: string;
-  email: string | null;
-}
-
-interface Property {
-  id: string;
-  title: string;
-  address: string;
-  city: string;
-  rooms: number | null;
-  area: number | null;
-  photos: string[] | null;
-}
-
-interface Payment {
-  id: string;
-  amount: number;
-  due_date: string;
-  paid_date: string | null;
-  status: string;
-  method: string;
-}
-
-interface LeaseBlock {
-  id: string;
-  start_date: string;
-  end_date: string | null;
-  rent_amount: number;
-  deposit: number;
-  status: string;
-  property: Property | null;
-  nextDue: Payment | null;
-  totalDue: number;
-  recentPayments: Payment[];
-}
 
 interface AgencyInfo {
   name: string;
   phone: string | null;
 }
+
+interface AccountSituation {
+  leaseNumber: string;
+  propertyAddress: string;
+  propertyCity: string;
+  totalDue: number;
+  nextDueDate: string | null;
+}
+
+interface IssueItem {
+  id: string;
+  title: string;
+  status: string;
+  created_at: string;
+}
+
+const statusConfig: Record<string, { label: string; color: string }> = {
+  OPEN:        { label: "Ouvert",   color: "bg-orange-100 text-orange-800" },
+  IN_PROGRESS: { label: "En cours", color: "bg-blue-100 text-blue-800" },
+  RESOLVED:    { label: "Résolu",   color: "bg-green-100 text-green-800" },
+  CLOSED:      { label: "Fermé",    color: "bg-gray-100 text-gray-700" },
+};
 
 function buildWhatsAppUrl(phone: string, message: string): string {
   const digits = phone.replace(/\D/g, "");
@@ -64,10 +45,11 @@ function buildWhatsAppUrl(phone: string, message: string): string {
 }
 
 export default function LocataireHomePage() {
-  const [tenant, setTenant] = useState<Tenant | null>(null);
-  const [leases, setLeases] = useState<LeaseBlock[]>([]);
-  const [selectedLeaseId, setSelectedLeaseId] = useState<string>("");
+  const [firstName, setFirstName] = useState<string>("");
   const [agency, setAgency] = useState<AgencyInfo | null>(null);
+  const [situation, setSituation] = useState<AccountSituation | null>(null);
+  const [issues, setIssues] = useState<IssueItem[]>([]);
+  const [issueTotal, setIssueTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -76,311 +58,238 @@ export default function LocataireHomePage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setLoading(false); return; }
 
-      const { data: tenantData } = await supabase
+      const { data: tenant } = await supabase
         .from("tenants")
-        .select("id, org_id, first_name, last_name, phone, email")
+        .select("id, org_id, first_name")
         .eq("user_id", user.id)
         .limit(1)
         .maybeSingle();
 
-      if (!tenantData) { setLoading(false); return; }
-      setTenant(tenantData as Tenant);
+      if (!tenant) { setLoading(false); return; }
+      setFirstName(tenant.first_name ?? "");
 
-      const { data: leasesData } = await supabase
-        .from("leases")
-        .select("id, start_date, end_date, rent_amount, deposit, status, properties(id, title, address, city, rooms, area, photos)")
-        .eq("tenant_id", tenantData.id)
-        .order("created_at", { ascending: false });
+      // Leases + payments + issues en parallèle
+      const [leasesRes, issuesRes, orgRes] = await Promise.all([
+        supabase
+          .from("leases")
+          .select("id, created_at, start_date, rent_amount, status, properties(title, address, city)")
+          .eq("tenant_id", tenant.id)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("issues")
+          .select("id, title, status, created_at")
+          .eq("tenant_id", tenant.id)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("organizations")
+          .select("name, memberships(role, status, profiles(phone))")
+          .eq("id", tenant.org_id)
+          .single(),
+      ]);
 
-      const allLeases = leasesData ?? [];
-      const leaseIds = allLeases.map((l) => l.id);
-
-      const { data: allPayments } = leaseIds.length > 0
-        ? await supabase
-            .from("payments")
-            .select("id, lease_id, amount, due_date, paid_date, status, method")
-            .in("lease_id", leaseIds)
-            .order("due_date", { ascending: true })
-        : { data: [] };
-
-      const paymentsByLease = new Map<string, Payment[]>();
-      (allPayments ?? []).forEach((p) => {
-        if (!paymentsByLease.has(p.lease_id)) paymentsByLease.set(p.lease_id, []);
-        paymentsByLease.get(p.lease_id)!.push(p as Payment);
-      });
-
-      const blocks: LeaseBlock[] = allLeases.map((l) => {
-        const property = Array.isArray(l.properties)
-          ? ((l.properties[0] as unknown) as Property | undefined) ?? null
-          : ((l.properties as unknown) as Property | null);
-
-        const payments = paymentsByLease.get(l.id) ?? [];
-        const nextDue = payments.find((p) => p.status === "PENDING" || p.status === "LATE") ?? null;
-        const totalDue = payments
-          .filter((p) => p.status === "PENDING" || p.status === "LATE")
-          .reduce((sum, p) => sum + p.amount, 0);
-        const recentPayments = [...payments].reverse().slice(0, 5);
-
-        return { id: l.id, start_date: l.start_date, end_date: l.end_date, rent_amount: l.rent_amount, deposit: l.deposit, status: l.status, property, nextDue, totalDue, recentPayments };
-      });
-
-      blocks.sort((a, b) => (a.status === "ACTIVE" ? -1 : 1) - (b.status === "ACTIVE" ? -1 : 1));
-      setLeases(blocks);
-      if (blocks.length > 0) setSelectedLeaseId(blocks[0].id);
-
-      const { data: org } = await supabase
-        .from("organizations")
-        .select("name, memberships(role, status, profiles(phone))")
-        .eq("id", tenantData.org_id)
-        .single();
-
+      // Agence
       let phone: string | null = null;
-      const orgAny = org as unknown as { name?: string; memberships?: Array<{ role: string; status: string; profiles: { phone: string | null } | Array<{ phone: string | null }> | null }> } | null;
+      const orgAny = orgRes.data as unknown as { name?: string; memberships?: Array<{ role: string; status: string; profiles: { phone: string | null } | Array<{ phone: string | null }> | null }> } | null;
       if (orgAny?.memberships) {
         const m = orgAny.memberships.find((m) => m.role === "ADMIN" && m.status === "ACTIVE") ?? orgAny.memberships.find((m) => m.status === "ACTIVE");
         if (m) phone = Array.isArray(m.profiles) ? (m.profiles[0]?.phone ?? null) : (m.profiles?.phone ?? null);
       }
       setAgency({ name: orgAny?.name ?? "Jappalé Immo", phone });
+
+      // Situation compte : bail actif ou le plus récent
+      const allLeases = leasesRes.data ?? [];
+      const activeLease = allLeases.find((l) => l.status === "ACTIVE") ?? allLeases[0] ?? null;
+
+      if (activeLease) {
+        const leaseIds = allLeases.map((l) => l.id);
+        const { data: payments } = await supabase
+          .from("payments")
+          .select("id, amount, due_date, status")
+          .in("lease_id", leaseIds)
+          .in("status", ["PENDING", "LATE"])
+          .order("due_date", { ascending: true });
+
+        const totalDue = (payments ?? []).reduce((s, p) => s + p.amount, 0);
+        const nextDue = (payments ?? [])[0]?.due_date ?? null;
+
+        const prop = Array.isArray(activeLease.properties)
+          ? (activeLease.properties[0] ?? null)
+          : (activeLease.properties as { title: string; address: string; city: string } | null);
+
+        const leaseNumber = `BAI-${new Date(activeLease.created_at).getFullYear()}-${activeLease.id.slice(0, 6).toUpperCase()}`;
+        setSituation({
+          leaseNumber,
+          propertyAddress: prop?.address ?? "",
+          propertyCity: prop?.city ?? "",
+          totalDue,
+          nextDueDate: nextDue,
+        });
+      }
+
+      // Demandes
+      const allIssues = (issuesRes.data ?? []) as IssueItem[];
+      setIssueTotal(allIssues.length);
+      // Seulement les actives (OPEN / IN_PROGRESS) pour l'aperçu
+      const activeIssues = allIssues.filter((i) => i.status === "OPEN" || i.status === "IN_PROGRESS").slice(0, 3);
+      setIssues(activeIssues);
+
       setLoading(false);
     }
     load();
   }, []);
 
   if (loading) return <div className="flex items-center justify-center py-20"><p className="text-muted-foreground">Chargement...</p></div>;
-  if (!tenant) return <div className="text-center py-20"><p>Locataire introuvable.</p></div>;
 
   const contactMessage = `Bonjour ${agency?.name ?? ""},\n\nJe vous contacte via mon espace locataire.`;
   const whatsappUrl = agency?.phone ? buildWhatsAppUrl(agency.phone, contactMessage) : null;
 
-  const lease = leases.find((l) => l.id === selectedLeaseId) ?? leases[0] ?? null;
+  const today = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const todayCap = today.charAt(0).toUpperCase() + today.slice(1);
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold">Bonjour {tenant.first_name} 👋</h1>
-        <p className="text-muted-foreground mt-1">Bienvenue sur votre espace locataire.</p>
+
+      {/* En-tête de bienvenue */}
+      <div className="rounded-xl bg-primary/5 border border-primary/10 p-6 space-y-2">
+        <h1 className="text-2xl sm:text-3xl font-bold">Bonjour {firstName} 👋</h1>
+        <p className="text-muted-foreground text-sm leading-relaxed max-w-2xl">
+          Ce portail vous facilite l&apos;accès à vos informations contractuelles et vous permet d&apos;interagir
+          avec votre bailleur. Vous pouvez consulter votre contrat, télécharger vos documents, suivre vos
+          paiements, nous signaler un problème et bien d&apos;autres fonctionnalités — tout pour fluidifier
+          votre relation avec {agency?.name ?? "votre agence"}.
+        </p>
       </div>
 
-      {leases.length === 0 ? (
+      <div className="grid md:grid-cols-2 gap-4">
+
+        {/* Situation du compte */}
         <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            Aucun bail associé à votre compte.
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          {/* Sélecteur de bail si plusieurs */}
-          {leases.length > 1 && (
-            <div className="flex items-center gap-3">
-              <label htmlFor="lease-select" className="text-sm font-medium text-muted-foreground whitespace-nowrap">
-                Bail affiché :
-              </label>
-              <div className="relative flex-1 max-w-xs">
-                <select
-                  id="lease-select"
-                  value={selectedLeaseId}
-                  onChange={(e) => setSelectedLeaseId(e.target.value)}
-                  className="w-full appearance-none rounded-lg border border-input bg-card px-3 py-2 pr-8 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  {leases.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.property?.title ?? `Bail ${l.id.slice(0, 6).toUpperCase()}`}
-                      {l.status === "ACTIVE" ? " · Actif" : " · Terminé"}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              </div>
-            </div>
-          )}
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <FileText className="h-5 w-5 text-primary" />
+              Situation de votre compte
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">{todayCap}</p>
+            {situation ? (
+              <>
+                <div className="space-y-0.5">
+                  <p className="text-sm font-semibold">Contrat n° {situation.leaseNumber}</p>
+                  {situation.propertyAddress && (
+                    <p className="text-sm text-muted-foreground">{situation.propertyAddress}</p>
+                  )}
+                  {situation.propertyCity && (
+                    <p className="text-sm text-muted-foreground">{situation.propertyCity}</p>
+                  )}
+                </div>
 
-          {lease && (() => {
-            const property = lease.property;
-            const mainPhoto = property?.photos?.[0] ?? null;
-            const isActive = lease.status === "ACTIVE";
-            const dueStatus = !lease.nextDue
-              ? { label: "À jour", tone: "bg-green-100 text-green-800" }
-              : lease.nextDue.status === "LATE"
-              ? { label: "En retard", tone: "bg-red-100 text-red-800" }
-              : { label: "En attente", tone: "bg-yellow-100 text-yellow-800" };
-
-            return (
-              <div className="space-y-4">
-                {leases.length > 1 && (
-                  <div className="flex items-center gap-3">
-                    <Badge variant={isActive ? "default" : "secondary"}>
-                      {isActive ? "Actif" : "Terminé"}
-                    </Badge>
+                {situation.totalDue === 0 ? (
+                  <div className="flex items-center gap-2 text-green-700">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    <span className="text-sm font-medium">Votre solde est à jour.</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-destructive">
+                    <TrendingDown className="h-4 w-4 shrink-0" />
+                    <span className="text-sm font-semibold">
+                      Solde dû : {situation.totalDue.toLocaleString("fr-FR")} FCFA
+                    </span>
                   </div>
                 )}
 
-                <div className="grid md:grid-cols-2 gap-4">
-                  {/* Logement */}
-                  <Card className="md:col-span-2">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Home className="h-5 w-5 text-primary" />
-                        Mon logement
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {property ? (
-                        <div className="flex flex-col sm:flex-row gap-4">
-                          {mainPhoto ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={mainPhoto} alt={property.title} className="w-full sm:w-48 h-40 object-cover rounded-lg" />
-                          ) : (
-                            <div className="w-full sm:w-48 h-40 rounded-lg bg-muted flex items-center justify-center">
-                              <Home className="h-10 w-10 text-muted-foreground" />
-                            </div>
-                          )}
-                          <div className="flex-1 space-y-2">
-                            <h3 className="font-semibold text-lg">{property.title}</h3>
-                            <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                              <MapPin className="h-4 w-4" />{property.address}, {property.city}
-                            </p>
-                            <div className="flex flex-wrap gap-2 pt-1">
-                              {property.rooms && <Badge variant="secondary">{property.rooms} pièces</Badge>}
-                              {property.area && <Badge variant="secondary">{property.area} m²</Badge>}
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-muted-foreground">Information non disponible.</p>
-                      )}
-                    </CardContent>
-                  </Card>
+                {situation.nextDueDate && situation.totalDue > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Prochaine échéance :{" "}
+                    {new Date(situation.nextDueDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
+                  </p>
+                )}
 
-                  {/* Prochaine échéance */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <CalendarDays className="h-5 w-5 text-primary" />
-                        Prochaine échéance
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {lease.nextDue ? (
-                        <>
-                          <p className="text-3xl font-bold">{lease.nextDue.amount.toLocaleString("fr-FR")} FCFA</p>
-                          <p className="text-sm text-muted-foreground">
-                            Échéance : {new Date(lease.nextDue.due_date).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
-                          </p>
-                          <span className={`inline-block text-xs font-medium px-2 py-1 rounded-full ${dueStatus.tone}`}>{dueStatus.label}</span>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-lg font-semibold">Aucune échéance en attente</p>
-                          <span className={`inline-block text-xs font-medium px-2 py-1 rounded-full ${dueStatus.tone}`}>{dueStatus.label}</span>
-                        </>
-                      )}
-                      {lease.totalDue > 0 && (
-                        <div className="mt-3 pt-3 border-t flex items-center gap-2 text-destructive">
-                          <TrendingDown className="h-4 w-4 shrink-0" />
-                          <span className="text-sm font-semibold">Solde dû : {lease.totalDue.toLocaleString("fr-FR")} FCFA</span>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                <Link href="/locataire/paiements">
+                  <Button variant="outline" size="sm" className="w-full mt-1">
+                    Voir mes paiements
+                  </Button>
+                </Link>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">Aucun contrat associé.</p>
+            )}
+          </CardContent>
+        </Card>
 
-                  {/* Mon bail */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <CreditCard className="h-5 w-5 text-primary" />
-                        Mon bail
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Début</span>
-                        <span className="font-medium">{new Date(lease.start_date).toLocaleDateString("fr-FR")}</span>
-                      </div>
-                      {lease.end_date && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Fin</span>
-                          <span className="font-medium">{new Date(lease.end_date).toLocaleDateString("fr-FR")}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Loyer mensuel</span>
-                        <span className="font-medium">{lease.rent_amount.toLocaleString("fr-FR")} FCFA</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Caution</span>
-                        <span className="font-medium">{lease.deposit.toLocaleString("fr-FR")} FCFA</span>
-                      </div>
-                      <div className="pt-3">
-                        <Link href="/locataire/paiements">
-                          <Button variant="outline" size="sm" className="w-full">Voir mes paiements</Button>
-                        </Link>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Historique récent */}
-                  {lease.recentPayments.length > 0 && (
-                    <Card className="md:col-span-2">
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-base">
-                          <CreditCard className="h-5 w-5 text-primary" />
-                          Historique récent
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          {lease.recentPayments.map((p) => (
-                            <div key={p.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                              <div className="flex items-center gap-3">
-                                {p.status === "PAID" ? <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                                  : p.status === "LATE" ? <AlertCircle className="h-4 w-4 text-destructive shrink-0" />
-                                  : <Clock className="h-4 w-4 text-yellow-500 shrink-0" />}
-                                <div>
-                                  <p className="text-sm font-medium">
-                                    {new Date(p.due_date).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
-                                  </p>
-                                  {p.status === "PAID" && p.paid_date && (
-                                    <p className="text-xs text-muted-foreground">Payé le {new Date(p.paid_date).toLocaleDateString("fr-FR")}</p>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-sm font-semibold">{p.amount.toLocaleString("fr-FR")} FCFA</p>
-                                <p className={`text-xs font-medium ${p.status === "PAID" ? "text-green-600" : p.status === "LATE" ? "text-destructive" : "text-yellow-600"}`}>
-                                  {p.status === "PAID" ? "Payé" : p.status === "LATE" ? "En retard" : "En attente"}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="mt-3">
-                          <Link href="/locataire/paiements">
-                            <Button variant="ghost" size="sm" className="w-full text-primary">Voir tous mes paiements →</Button>
-                          </Link>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
+        {/* Vos demandes */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Wrench className="h-5 w-5 text-primary" />
+              Vos demandes
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {issues.length === 0 ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Clock className="h-4 w-4 shrink-0" />
+                <span className="text-sm">Vous n&apos;avez pas de demande en cours.</span>
               </div>
-            );
-          })()}
-        </>
-      )}
+            ) : (
+              <div className="space-y-2">
+                {issues.map((issue) => {
+                  const s = statusConfig[issue.status] ?? { label: issue.status, color: "bg-gray-100 text-gray-700" };
+                  return (
+                    <div key={issue.id} className="flex items-start justify-between gap-2 py-1.5 border-b last:border-0">
+                      <div className="flex items-start gap-2 min-w-0">
+                        <AlertCircle className="h-4 w-4 text-orange-500 mt-0.5 shrink-0" />
+                        <p className="text-sm font-medium truncate">{issue.title}</p>
+                      </div>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${s.color}`}>{s.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2 pt-1">
+              <Link href="/locataire/signaler">
+                <Button size="sm" className="w-full gap-1.5">
+                  <Plus className="h-4 w-4" />
+                  Faire une nouvelle demande
+                </Button>
+              </Link>
+              {issueTotal > 0 && (
+                <Link href="/locataire/signaler">
+                  <Button variant="ghost" size="sm" className="w-full gap-1.5 text-muted-foreground">
+                    <ClipboardList className="h-4 w-4" />
+                    Historique de mes demandes ({issueTotal})
+                  </Button>
+                </Link>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+      </div>
 
       {/* Contact agence */}
       <Card>
         <CardContent className="py-5 flex items-center justify-between flex-wrap gap-3">
           <div>
             <p className="font-medium">Besoin d&apos;aide ?</p>
-            <p className="text-sm text-muted-foreground">Contactez votre agence {agency?.name ? `· ${agency.name}` : ""}</p>
+            <p className="text-sm text-muted-foreground">
+              Contactez votre agence {agency?.name ? `· ${agency.name}` : ""}
+            </p>
           </div>
           {whatsappUrl ? (
             <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
-              <Button className="gap-2"><MessageCircle className="h-4 w-4" />Contacter l&apos;agence</Button>
+              <Button className="gap-2">
+                <MessageCircle className="h-4 w-4" />
+                Contacter l&apos;agence
+              </Button>
             </a>
           ) : (
-            <Button disabled className="gap-2"><MessageCircle className="h-4 w-4" />Contact indisponible</Button>
+            <Button disabled className="gap-2">
+              <MessageCircle className="h-4 w-4" />
+              Contact indisponible
+            </Button>
           )}
         </CardContent>
       </Card>
