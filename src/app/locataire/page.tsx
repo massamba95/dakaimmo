@@ -8,11 +8,14 @@ import { Button } from "@/components/ui/button";
 import {
   MessageCircle, Plus, FileText, ClipboardList,
   CheckCircle2, AlertCircle, Clock, Wrench, TrendingDown,
+  Phone, Mail, MapPin,
 } from "lucide-react";
 
 interface AgencyInfo {
   name: string;
   phone: string | null;
+  email: string | null;
+  address: string | null;
 }
 
 interface LeaseSituation {
@@ -81,19 +84,27 @@ export default function LocataireHomePage() {
           .order("created_at", { ascending: false }),
         supabase
           .from("organizations")
-          .select("name, memberships(role, status, profiles(phone))")
+          .select("name, memberships(role, status, profiles(phone, email, address))")
           .eq("id", tenant.org_id)
           .single(),
       ]);
 
       // Agence
       let phone: string | null = null;
-      const orgAny = orgRes.data as unknown as { name?: string; memberships?: Array<{ role: string; status: string; profiles: { phone: string | null } | Array<{ phone: string | null }> | null }> } | null;
+      type OrgProfile = { phone: string | null; email: string | null; address: string | null };
+      const orgAny = orgRes.data as unknown as { name?: string; memberships?: Array<{ role: string; status: string; profiles: OrgProfile | OrgProfile[] | null }> } | null;
+      let agencyEmail: string | null = null;
+      let agencyAddress: string | null = null;
       if (orgAny?.memberships) {
         const m = orgAny.memberships.find((m) => m.role === "ADMIN" && m.status === "ACTIVE") ?? orgAny.memberships.find((m) => m.status === "ACTIVE");
-        if (m) phone = Array.isArray(m.profiles) ? (m.profiles[0]?.phone ?? null) : (m.profiles?.phone ?? null);
+        if (m) {
+          const p = Array.isArray(m.profiles) ? (m.profiles[0] ?? null) : m.profiles;
+          phone = p?.phone ?? null;
+          agencyEmail = p?.email ?? null;
+          agencyAddress = p?.address ?? null;
+        }
       }
-      setAgency({ name: orgAny?.name ?? "Jappalé Immo", phone });
+      setAgency({ name: orgAny?.name ?? "Jappalé Immo", phone, email: agencyEmail, address: agencyAddress });
 
       // Situation par bail
       const allLeases = leasesRes.data ?? [];
@@ -337,25 +348,56 @@ export default function LocataireHomePage() {
 
       {/* Contact agence */}
       <Card>
-        <CardContent className="py-5 flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <p className="font-medium">Besoin d&apos;aide ?</p>
-            <p className="text-sm text-muted-foreground">
-              Contactez votre agence {agency?.name ? `· ${agency.name}` : ""}
-            </p>
-          </div>
-          {whatsappUrl ? (
-            <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
-              <Button className="gap-2">
+        <CardContent className="py-5 space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <p className="font-medium">Besoin d&apos;aide ?</p>
+              <p className="text-sm text-muted-foreground">
+                Contactez votre agence {agency?.name ? `· ${agency.name}` : ""}
+              </p>
+            </div>
+            {whatsappUrl ? (
+              <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
+                <Button className="gap-2">
+                  <MessageCircle className="h-4 w-4" />
+                  Contacter l&apos;agence
+                </Button>
+              </a>
+            ) : (
+              <Button disabled className="gap-2">
                 <MessageCircle className="h-4 w-4" />
-                Contacter l&apos;agence
+                Contact indisponible
               </Button>
-            </a>
-          ) : (
-            <Button disabled className="gap-2">
-              <MessageCircle className="h-4 w-4" />
-              Contact indisponible
-            </Button>
+            )}
+          </div>
+
+          {(agency?.phone || agency?.email || agency?.address) && (
+            <div className="border-t pt-3 flex flex-wrap gap-4">
+              {agency.phone && (
+                <a
+                  href={`tel:${agency.phone}`}
+                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Phone className="h-4 w-4 shrink-0" />
+                  {agency.phone}
+                </a>
+              )}
+              {agency.email && (
+                <a
+                  href={`mailto:${agency.email}`}
+                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Mail className="h-4 w-4 shrink-0" />
+                  {agency.email}
+                </a>
+              )}
+              {agency.address && (
+                <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <MapPin className="h-4 w-4 shrink-0" />
+                  {agency.address}
+                </span>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>
