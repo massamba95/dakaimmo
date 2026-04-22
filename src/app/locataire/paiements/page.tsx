@@ -185,10 +185,15 @@ export default function LocatairePaiementsPage() {
     );
   }
 
+  const today = new Date().toISOString().split("T")[0];
   const totalPaid = payments
     .filter((p) => p.status === "PAID")
     .reduce((sum, p) => sum + p.amount, 0);
-  const lateCount = payments.filter((p) => p.status === "LATE" || p.status === "PARTIAL").length;
+  const lateCount = payments.filter((p) =>
+    p.status === "LATE" ||
+    p.status === "PARTIAL" ||
+    (p.status === "PENDING" && p.due_date < today)
+  ).length;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
