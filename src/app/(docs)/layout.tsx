@@ -8,45 +8,50 @@ import { cn } from "@/lib/utils";
 import {
   Building2, Menu, X, Rocket, Home, Users, FileText, CreditCard,
   Wrench, Download, Settings, Crown, UserCircle, BookOpen,
+  FileDown,
 } from "lucide-react";
 
 const navSections = [
   {
     title: "Introduction",
     items: [
-      { href: "/aide",             label: "Bienvenue",              icon: BookOpen },
-      { href: "/aide/demarrage",   label: "Premiers pas",           icon: Rocket },
+      { href: "/aide",             label: "Bienvenue",              icon: BookOpen,   pdf: "00-introduction.pdf" },
+      { href: "/aide/demarrage",   label: "Premiers pas",           icon: Rocket,     pdf: "01-demarrage.pdf" },
     ],
   },
   {
     title: "Gestion courante",
     items: [
-      { href: "/aide/biens",            label: "Biens immobiliers",       icon: Home },
-      { href: "/aide/locataires",       label: "Locataires",              icon: Users },
-      { href: "/aide/baux",             label: "Baux & contrats",         icon: FileText },
-      { href: "/aide/paiements",        label: "Paiements",               icon: CreditCard },
-      { href: "/aide/signalements",     label: "Signalements",            icon: Wrench },
-      { href: "/aide/documents",        label: "Quittances & documents",  icon: Download },
+      { href: "/aide/biens",            label: "Biens immobiliers",       icon: Home,        pdf: "02-biens.pdf" },
+      { href: "/aide/locataires",       label: "Locataires",              icon: Users,       pdf: "03-locataires.pdf" },
+      { href: "/aide/baux",             label: "Baux & contrats",         icon: FileText,    pdf: "04-baux.pdf" },
+      { href: "/aide/paiements",        label: "Paiements",               icon: CreditCard,  pdf: "05-paiements.pdf" },
+      { href: "/aide/signalements",     label: "Signalements",            icon: Wrench,      pdf: "06-signalements.pdf" },
+      { href: "/aide/documents",        label: "Quittances & documents",  icon: Download,    pdf: "07-documents.pdf" },
     ],
   },
   {
     title: "Administration",
     items: [
-      { href: "/aide/parametres",  label: "Paramètres",     icon: Settings },
-      { href: "/aide/abonnement",  label: "Abonnement",     icon: Crown },
+      { href: "/aide/parametres",  label: "Paramètres",     icon: Settings,  pdf: "08-parametres.pdf" },
+      { href: "/aide/abonnement",  label: "Abonnement",     icon: Crown,     pdf: "09-abonnement.pdf" },
     ],
   },
   {
     title: "Côté locataire",
     items: [
-      { href: "/aide/espace-locataire", label: "Espace locataire", icon: UserCircle },
+      { href: "/aide/espace-locataire", label: "Espace locataire", icon: UserCircle,  pdf: "10-espace-locataire.pdf" },
     ],
   },
 ];
 
+const allItems = navSections.flatMap((s) => s.items);
+
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const currentItem = allItems.find((i) => i.href === pathname);
+  const currentPdf = currentItem?.pdf;
 
   return (
     <div className="min-h-screen bg-muted/20">
@@ -158,6 +163,24 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
 
         {/* Contenu */}
         <main className="flex-1 min-w-0">
+          {/* Barre d'actions (cachée en print) */}
+          <div className="no-print mb-4 flex items-center justify-end gap-2 flex-wrap">
+            {currentPdf && (
+              <a href={`/docs/pdfs/${currentPdf}`} download>
+                <Button size="sm" variant="outline" className="gap-2">
+                  <FileDown className="h-4 w-4" />
+                  Télécharger cette section (PDF)
+                </Button>
+              </a>
+            )}
+            <a href="/docs/pdfs/guide-complet.pdf" download>
+              <Button size="sm" className="gap-2">
+                <FileDown className="h-4 w-4" />
+                Guide complet (PDF)
+              </Button>
+            </a>
+          </div>
+
           <article className="doc-content bg-white rounded-xl border p-6 sm:p-10 max-w-3xl">
             {children}
           </article>

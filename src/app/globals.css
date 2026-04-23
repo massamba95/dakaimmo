@@ -182,3 +182,32 @@
 .doc-content td {
   @apply py-2 px-3 text-foreground/80;
 }
+
+/* ============================================================
+   Print styles — docs PDF generation
+   ============================================================ */
+@media print {
+  header, aside, .no-print {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+  }
+  article {
+    border: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    max-width: 100% !important;
+  }
+  .doc-content h2 {
+    page-break-before: auto;
+    break-before: auto;
+  }
+  .doc-content figure {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  body {
+    background: white !important;
+  }
+}
