@@ -23,6 +23,7 @@ import {
   CreditCard as CreditCardIcon,
   CalendarCheck,
   Wrench,
+  BookOpen,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { Permission } from "@/lib/permissions";
@@ -64,6 +65,7 @@ export function SidebarNav() {
     { href: "/dashboard/team", label: "Equipe", icon: UsersRound, permission: "team:manage" },
     { href: "/dashboard/upgrade",  label: "Mon abonnement", icon: CreditCardIcon, permission: null },
     { href: "/dashboard/settings", label: "Parametres",     icon: Settings,       permission: null },
+    { href: "/aide",               label: "Aide",           icon: BookOpen,       permission: null },
   ];
 
   const visibleItems = navItems.filter(

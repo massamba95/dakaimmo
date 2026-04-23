@@ -128,3 +128,57 @@
     @apply font-sans;
   }
 }
+/* ============================================================
+   Documentation pages
+   ============================================================ */
+.doc-content h1 {
+  @apply text-3xl font-bold tracking-tight mb-2;
+}
+.doc-content h2 {
+  @apply text-2xl font-bold tracking-tight mt-10 mb-4 pb-2 border-b;
+}
+.doc-content h3 {
+  @apply text-lg font-semibold tracking-tight mt-6 mb-2;
+}
+.doc-content p {
+  @apply leading-relaxed text-foreground/80 my-3;
+}
+.doc-content ul {
+  @apply list-disc pl-6 my-3 space-y-1;
+}
+.doc-content ol {
+  @apply list-decimal pl-6 my-3 space-y-1;
+}
+.doc-content li {
+  @apply text-foreground/80 leading-relaxed;
+}
+.doc-content li::marker {
+  @apply text-muted-foreground;
+}
+.doc-content a {
+  @apply text-primary hover:underline;
+}
+.doc-content strong {
+  @apply font-semibold text-foreground;
+}
+.doc-content code {
+  @apply bg-muted px-1.5 py-0.5 rounded text-sm font-mono;
+}
+.doc-content table {
+  @apply w-full text-sm my-4 border-collapse;
+}
+.doc-content thead tr {
+  @apply border-b bg-muted/50;
+}
+.doc-content th {
+  @apply text-left py-2 px-3 font-semibold;
+}
+.doc-content tbody tr {
+  @apply border-b;
+}
+.doc-content tbody tr:last-child {
+  @apply border-0;
+}
+.doc-content td {
+  @apply py-2 px-3 text-foreground/80;
+}

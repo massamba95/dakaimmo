@@ -652,6 +652,7 @@ export default function HomePage() {
                   <li><a href="#features" className="text-sm text-muted-foreground hover:text-foreground">Fonctionnalités</a></li>
                   <li><a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground">Tarifs</a></li>
                   <li><a href="#faq" className="text-sm text-muted-foreground hover:text-foreground">FAQ</a></li>
+                  <li><Link href="/aide" className="text-sm text-muted-foreground hover:text-foreground">Documentation</Link></li>
                 </ul>
               </div>
               <div>
