@@ -281,6 +281,9 @@ export default function HomePage() {
             <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               Tarifs
             </a>
+            <Link href="/aide" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Aide
+            </Link>
             <a href="#faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               FAQ
             </a>
