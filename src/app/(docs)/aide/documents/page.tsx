@@ -38,6 +38,7 @@ export default function DocumentsPage() {
       </ul>
 
       <Screenshot
+        placeholder
         caption="Exemple d'une quittance PDF générée par Jappalé Immo."
         filename="documents/01-quittance-example.png"
       />

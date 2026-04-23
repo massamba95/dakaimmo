@@ -28,6 +28,7 @@ export default function EspaceLocatairePage() {
       </p>
 
       <Screenshot
+        placeholder
         caption="Email d'invitation reçu par le locataire."
         filename="locataire/01-invitation-email.png"
       />

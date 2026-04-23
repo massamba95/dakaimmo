@@ -7,12 +7,18 @@ interface ScreenshotProps {
   filename?: string;
 }
 
-export function Screenshot({ src, alt, caption, filename }: ScreenshotProps) {
-  if (src) {
+export function Screenshot({ src, alt, caption, filename, placeholder }: ScreenshotProps & { placeholder?: boolean }) {
+  const finalSrc = src ?? (filename ? `/docs/${filename}` : null);
+
+  if (finalSrc && !placeholder) {
     return (
       <figure className="my-6">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={alt ?? caption} className="w-full rounded-lg border shadow-sm" />
+        <img
+          src={finalSrc}
+          alt={alt ?? caption}
+          className="w-full rounded-lg border shadow-sm"
+        />
         <figcaption className="mt-2 text-xs text-muted-foreground text-center italic">
           {caption}
         </figcaption>
