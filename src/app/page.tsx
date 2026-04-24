@@ -24,6 +24,10 @@ import {
   MessageCircle,
   Mail,
   Phone,
+  Menu,
+  X,
+  UserCircle,
+  BookOpen,
 } from "lucide-react";
 
 const features = [
@@ -262,6 +266,9 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 }
 
 export default function HomePage() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const closeMenu = () => setMobileMenuOpen(false);
+
   return (
     <div className="min-h-screen">
       {/* Header */}
@@ -288,8 +295,8 @@ export default function HomePage() {
               FAQ
             </a>
           </nav>
-          <div className="flex items-center gap-3">
-            <Link href="/login?redirect=/locataire" className="hidden sm:block">
+          <div className="hidden md:flex items-center gap-3">
+            <Link href="/login?redirect=/locataire">
               <Button variant="ghost" size="sm">Espace locataire</Button>
             </Link>
             <Link href="/login">
@@ -299,7 +306,85 @@ export default function HomePage() {
               <Button size="sm">S&apos;inscrire</Button>
             </Link>
           </div>
+          {/* Mobile: bouton inscription + hamburger */}
+          <div className="flex md:hidden items-center gap-2">
+            <Link href="/register">
+              <Button size="sm">S&apos;inscrire</Button>
+            </Link>
+            <button
+              className="p-2 rounded-md hover:bg-muted transition-colors"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Menu"
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </div>
         </div>
+
+        {/* Menu mobile déroulant */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t bg-white">
+            <nav className="container mx-auto px-4 py-4 space-y-1">
+              <a
+                href="#features"
+                onClick={closeMenu}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm hover:bg-muted"
+              >
+                <Star className="h-4 w-4 text-muted-foreground" />
+                Fonctionnalités
+              </a>
+              <a
+                href="#how"
+                onClick={closeMenu}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm hover:bg-muted"
+              >
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                Comment ça marche
+              </a>
+              <a
+                href="#pricing"
+                onClick={closeMenu}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm hover:bg-muted"
+              >
+                <CreditCard className="h-4 w-4 text-muted-foreground" />
+                Tarifs
+              </a>
+              <Link
+                href="/aide"
+                onClick={closeMenu}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm hover:bg-muted"
+              >
+                <BookOpen className="h-4 w-4 text-muted-foreground" />
+                Documentation
+              </Link>
+              <a
+                href="#faq"
+                onClick={closeMenu}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm hover:bg-muted"
+              >
+                <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                FAQ
+              </a>
+              <div className="border-t my-2" />
+              <Link
+                href="/login?redirect=/locataire"
+                onClick={closeMenu}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm hover:bg-muted"
+              >
+                <UserCircle className="h-4 w-4 text-muted-foreground" />
+                Espace locataire
+              </Link>
+              <Link
+                href="/login"
+                onClick={closeMenu}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm hover:bg-muted"
+              >
+                <UserPlus className="h-4 w-4 text-muted-foreground" />
+                Connexion
+              </Link>
+            </nav>
+          </div>
+        )}
       </header>
 
       {/* Hero */}
