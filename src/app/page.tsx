@@ -358,6 +358,16 @@ export default function HomePage() {
                 Documentation
               </Link>
               <a
+                href="/plaquette-jappaleimmo.pdf"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={closeMenu}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm hover:bg-muted"
+              >
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                Plaquette commerciale (PDF)
+              </a>
+              <a
                 href="#faq"
                 onClick={closeMenu}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm hover:bg-muted"
@@ -430,6 +440,15 @@ export default function HomePage() {
           <p className="mt-4 text-sm text-muted-foreground">
             Essai gratuit 1 mois · Aucune carte bancaire · Résiliable à tout moment
           </p>
+          <a
+            href="/plaquette-jappaleimmo.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 inline-flex items-center gap-2 text-sm text-primary hover:underline"
+          >
+            <FileText className="h-4 w-4" />
+            Télécharger la plaquette (PDF)
+          </a>
 
           {/* Paiement par */}
           <div className="mt-12 flex items-center justify-center gap-6 text-sm text-muted-foreground">
@@ -741,6 +760,7 @@ export default function HomePage() {
                   <li><a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground">Tarifs</a></li>
                   <li><a href="#faq" className="text-sm text-muted-foreground hover:text-foreground">FAQ</a></li>
                   <li><Link href="/aide" className="text-sm text-muted-foreground hover:text-foreground">Documentation</Link></li>
+                  <li><a href="/plaquette-jappaleimmo.pdf" target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground">Plaquette PDF</a></li>
                 </ul>
               </div>
               <div>
